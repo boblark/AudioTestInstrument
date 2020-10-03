@@ -52,26 +52,6 @@ e
           Updated EEPROM for these. Fixed double precision constants being read as floats.
 */
 
-
-/*    NOTES TEMP <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
- * Loading EEPROM data
-Turn-on EEPROM version was 80
-EEPROM data first updated to that of version 0.70
-A new serial (not touch screen) CALSAVE 0 n  and  CALSAVE 1 n  are needed.
-EEPROM data has been updated to that of version 0.80
-including default cal values for Vin and Vout.
-EEPROM Load of 536 bytes
-AVNA_0.80
-Voltage Check (expect 145 to 175): 156
-
-WARNING: '-fsingle-precision-constant' is enabled in ...hardware/teensy/avr/boards.txt
-         Minor errors may occur in calculations.
-         See www.janbob.com/electron/AVNA1/AVNA1.htm#DoublePrecision for info.
-#define POINT_ONE ((double) 0.1L)
-const double POINT_ONE = 0.1L;
- */    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
 #define CURRENT_VERSION 80
 
@@ -784,7 +764,6 @@ namespace std {
 }
 // ====================================================================================
 
-//uint16_t zz=0;
 
 // ==============================  SETUP  =============================================
 void setup()
@@ -797,8 +776,7 @@ void setup()
   panelLED(LSTART);
   panelLED(LRED);
   Serial.begin(9600);     // 9600 is not used, it is always 12E6
-  while (!Serial) ;       //Wait for USB serial
-
+  delay(1000);            //Wait for USB serial
   // X.reserve(nn) immediately sets memory for nn X-elements.
   Z.reserve(201);
   Y.reserve(201);
@@ -881,6 +859,7 @@ void setup()
      tft.setCursor(0, 184);
      tft.print("      See Serial Monitor for details.");
      }
+// BELIEVED TO BE SOLVED
 #endif
 
 
@@ -938,8 +917,8 @@ void setup()
   factorFreq = FBASE / sampleRateExact;    // 44117.65f / 
   // Setup callbacks for SerialCommand commands
 
-  // Configure the ASA window algorithm to use;  almost no sidelobes:
-  fft1024p.windowFunction(AudioWindowHanning1024);   //BlackmanHarris1024);
+  // Configure the ASA window algorithm to use
+  fft1024p.windowFunction(AudioWindowHanning1024);
 
   SCmd.addCommand("ZMEAS", ZmeasCommand);
   SCmd.addCommand("Z", ZmeasCommand);

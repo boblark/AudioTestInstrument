@@ -1,25 +1,13 @@
 
 // ------------------- Touch LCD Menu Response Functions  --------------------------
-/* LCD touchscreen operation is based on avanState levels, set by menus (or serial commands):
- * avnaState
- *     0 - IDLE     Idle, no measurment being made
- *     1 - ZSINGLE  Z Meas 1 Freq
- *     2 - TSINGLE  T Meas 1 Freq
- *     3 - ZSWEEP   Z Meas Sweep
- *     4 - TSWEEPT  Meas Sweep
- *     5 - WHATSIT  What Component
- *     6 - LCDHELP  Help
- */
 
-// Menus at bottpm run vertically, 200 to 240. Lines at top are 0 to 38.
+// Menus at bottom occupy vertically 200 to 240. Lines at top are 0 to 38.
 void tToInstrumentHome(void)
   {
   tft.fillRect(0, 0, 320, 200, ILI9341_BLACK);
   topLine1();  topLine2();
   instrument = AVNA;
   avnaState = 0;
-  //sigGen = 0;
-  //tft.fillRect(0, 38, tft.width(), 200-40, ILI9341_BLACK);
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
   tft.setCursor(0, 38);
@@ -42,7 +30,6 @@ void tToInstrumentHome(void)
   dataValidZSweep = false;
   clearStatus();
   }
-
 
 void tService(void)
   {
