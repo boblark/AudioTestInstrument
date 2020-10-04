@@ -2,6 +2,7 @@
 Follow on from W7PUA Audio Vector Network Analyzer adding other instruments.
 
 WORK N PROGRESS -  Beta test level for rev 0.80.  Bob  W7PUA
+
 Version 0.80 Change Summary
 
 All capabilities of Version 0.70 plus the following:
