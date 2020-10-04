@@ -123,7 +123,7 @@ e
 #include <ILI9341_t3.h>
 // <font_Arial.h> from ILI9341_t3
 #include <font_Arial.h>
-#include "AVNA7defaultParameters.h"
+#include "AVNA8defaultParameters.h"
 // use fifo buffer for serial input of commands:
 #include "CircularBuffer.h"
 
