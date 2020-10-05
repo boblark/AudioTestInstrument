@@ -14,3 +14,8 @@ All capabilities of Version 0.70 plus the following:
 * Calibration of input and output levels and for the touch screen.
 * Correction of several bugs, such as the handling of double-precision constants.
 
+![Control Screens, AVNA Test Instrument](/images/AVNA_2Scr1)
+
+![Signal Generator Screens, AVNA Test Instrument](/images/AVNA_2Scr2)
+
+![Vector Voltmeter and Spectrum Analyzer Screens, AVNA Test Instrument](/images/AVNA_2Scr3)
