@@ -126,9 +126,6 @@ Using library Wire at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/t
 Using library EEPROM at version 2.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/EEPROM 
 Using library XPT2046_Touchscreen at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/XPT2046_Touchscreen 
 Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/ILI9341_t3 
-
-FIX:
-Using library CircularBuffer-1.3.3 at version 1.3.3 in folder: /home/bob/Documents/Arduino_RSL/libraries/CircularBuffer-1.3.3 
 #endif
 
 #include <stdio.h>
@@ -556,7 +553,7 @@ struct sigGen {  // Structure defined here.  See EEPROM save for asg[]
     1030.0f,  0.2828f, false, WAVEFORM_SINE,
     1400.0f,  0.05f,   false, WAVEFORM_SINE,
     5000.0f,  0.0f,    false, WAVEFORM_SQUARE,
-    22000.0f, 0.1f,    false, NOISE};
+    40000.0f, 0.1f,    false, NOISE};
 
 
 //          ----------------------------------------------------------
@@ -1039,7 +1036,7 @@ void setup()
     else
       mixer1.gain(ii, 0.0f);
     }
-  noise1.amplitude(0.0f);       // Fourth generator is noise, set now to zero.
+  noise1.amplitude(0.1f);       // Fourth generator is noise, turn on here.
   mixer1.gain(3, 0.0f);         // and not enabled, either
 
   // The following sets up serial port 4, 9600 baud RS-232 control of the AVNA using comands from the
@@ -1812,8 +1809,9 @@ void setSample(uint16_t nS)
   Serial.println(factorFreq);
 #endif
   // The 4 sig gens need to be reprogrammed for new factorFreq
-  for (unsigned int ii = 0; ii<4; ii++)
+  for (unsigned int ii = 0; ii<3; ii++)
     sgWaveform[ii].begin(uSave.lastState.sgCal*asg[ii].amplitude, factorFreq*asg[ii].freq, asg[ii].type);
+ //  SET LPF ON NOISE GEN <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   }
 
 /* Fir coefficient array and length.
