@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "WProgram.h" 
 #endif
 
-#include "SerialCommandR.h"
+#include "SerialCommandR2.h"
 
 #include <string.h>
 #ifndef SERIALCOMMAND_HARDWAREONLY
@@ -114,8 +114,6 @@ void SerialCommand::readSerial()
     while ((usingSoftwareSerial && Serial.available() > 0) || (usingSoftwareSerial && SoftSerial->available() > 0) )
     #endif
         {
-        uint16_t i; 
-        boolean matched; 
         if (!usingSoftwareSerial)
             {
             // Hardware serial port

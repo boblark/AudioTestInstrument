@@ -24,7 +24,7 @@
  */
 void doFFT(void)
   {
-  float32_t specDB, maxOut, pTemp;
+  float32_t specDB, pTemp;
   static uint16_t countMax = 100;  //  Make global and user adjustable
   static uint16_t countAve = 0;
   float32_t aveFactorDB;
@@ -43,7 +43,7 @@ void doFFT(void)
 
     if(++countAve == countMax)  // Averaging is compete, get info and plot
       {
-      specMax = 0.0f;
+      specMax = 0.0f; iiMax = 0;
       for(int ii=0; ii<512; ii++)
         {
         if (avePower[ii] > specMax)  // Find highest peak of 512
@@ -77,6 +77,7 @@ void doFFT(void)
       //              f = (L + (2-R)/(1+R))*f_sample/1024
       //        otherwise
       //              f = (L - (2-R)/(1+R))*f_sample/1024  "
+      vm = 0.0000001; vp = 0.0000001;  // Stop compiler warning
       if (iiMax > 0)
         vm = sqrtf(avePower[iiMax - 1]);
       vc = sqrtf(avePower[iiMax]);

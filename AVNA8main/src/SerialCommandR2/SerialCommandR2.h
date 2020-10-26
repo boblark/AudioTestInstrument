@@ -1,4 +1,4 @@
-/******************************************************************************* 
+/* ****************************************************************************** 
 SerialCommandR is a modification of SerialCommand
 1 - Sets default end of command, term, to '#'
 2 - Makes term programable with method .setTerm(char t).
@@ -44,8 +44,8 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ***********************************************************************************/
-#ifndef SerialCommand_h
-#define SerialCommand_h
+#ifndef SerialCommandR2_h
+#define SerialCommandR2_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
@@ -76,7 +76,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 #define SERIALCOMMANDBUFFER 50
-// Was 10 RSL, this is fine for Teensy, but excessive for most Arduino memory sizes:
+// Was 10 RSL, new value is fine for Teensy, but excessive for most Arduino memory sizes:
 #define MAXSERIALCOMMANDS   100
 // Was 2  RSL:
 #define MAXDELIMETER 5

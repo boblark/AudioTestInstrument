@@ -1,5 +1,5 @@
-//RSL Version <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-//    FILE: Complex.cpp
+//  RSL Version  complexR2.cpp
+//    FILE: Complex.cpp (modified from)
 //  AUTHOR: Rob Tillaart
 // VERSION: 0.1.07
 // PURPOSE: library for Complex math for Arduino
@@ -10,7 +10,7 @@
 
 // 0.1.07 - refactor interfaces
 
-#include "complexR.h"
+#include "complexR2.h"
 
 // RSL Set format for printing
 // comma true or false;  parens true or false;  traili true or false;

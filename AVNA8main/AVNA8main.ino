@@ -1,6 +1,6 @@
 /*  RSL_VNA8 Arduino sketch for audio VNA measurements.
  *  Copyright (c) 2016-2020 Robert Larkin  W7PUA
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -56,15 +56,16 @@
    v0.8.0 Added Vector Voltmeter, Spectrum Analyzer and 4x Sig Generators.  Added calibration for in/out levels
           to support these.  Added screen display of spectrum.  Added digit-bydigit up/down widget.
           Updated EEPROM for these. Fixed double precision constants being read as floats.
+   v0.8.1 Converted sig gen 4 to Gaussian noise gen.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
-#define CURRENT_VERSION 80
+#define CURRENT_VERSION 81
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
 // Compile this feature or not:
-#define HWSERIAL4_USED 1
+#define HWSERIAL4_USED 0
 
 #if HWSERIAL4_USED
     uint8_t incomingByte;
@@ -76,7 +77,7 @@
    This program was tested with Arduino 1.8.2 and Teensyduino 1.36.
 */
 
-/* The audio board uses the following pins.
+/* The audio board uses the following pins:
     9 - BCLK
    11 - MCLK
    13 - RX
@@ -85,6 +86,7 @@
    19 - SCL
    22 - TX
    23 - LRCLK
+   Optional separate RS-232 pport:
    31 - Serial 4 for 9600 baud control, RX4 in to AVNA rev 7.0
    32 - Serial 4 for 9600 baud control, TX4 out of AVNA rev 7.0
    Five pins are used for control of the AVNA:
@@ -110,28 +112,47 @@
    24 - Touch IRQ
 */
 
+#if 0
+LIBRARY SUMMARY fromCompile/Show Compile Detail:
+
+Multiple libraries were found for "SD.h"
+ Used: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD
+ Not used: /home/bob/arduino-1.8.13/libraries/SD
+Using library Audio at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Audio 
+Using library SPI at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SPI 
+Using library SD at version 1.2.2 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD 
+Using library SerialFlash at version 0.5 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SerialFlash 
+Using library Wire at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Wire 
+Using library EEPROM at version 2.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/EEPROM 
+Using library XPT2046_Touchscreen at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/XPT2046_Touchscreen 
+Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/ILI9341_t3 
+
+FIX:
+Using library CircularBuffer-1.3.3 at version 1.3.3 in folder: /home/bob/Documents/Arduino_RSL/libraries/CircularBuffer-1.3.3 
+#endif
+
+#include <stdio.h>
+#include <math.h>
 #include <Audio.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <SD.h>
+//#include <SD.h>
 #include <SD_t3.h>
 #include <SerialFlash.h>
 #include <EEPROM.h>
-
 #include <XPT2046_Touchscreen.h>
-#include "complexR.h"
-#include "SerialCommandR.h"
-#include <stdio.h>
-#include <math.h>
+#include "src/complexR2/complexR2.h"
+#include "src/SerialCommandR2/SerialCommandR2.h"
+#include "src/analyze_fft1024_p/analyze_fft1024_p.h"
+#include "src/synth_GaussianWhiteNoiseR2/synth_GaussianWhiteNoiseR2.h"
+// use fifo buffer for serial input of commands:
+#include "src/CircularBufferR2/CircularBufferR2.h"
 #include <vector>
-#include "analyze_fft1024_p.h"
- // swap() collision between ILI9341_t3 and vector.  A problem?  Order as shown stops
+// swap() collision between ILI9341_t3 and vector.  A problem?  Order as shown stops error
 #include <ILI9341_t3.h>
 // <font_Arial.h> from ILI9341_t3
 #include <font_Arial.h>
 #include "AVNA8defaultParameters.h"
-// use fifo buffer for serial input of commands:
-#include "CircularBuffer.h"
 
 #define DIAGNOSTICS 0
 // static params want to come from EEPROM.  Set following to 1 to reset these to initial values
@@ -248,7 +269,7 @@
 // Touch IRQ pin
 #define TIRQ_PIN 24
 
-// These are the same as Teensy Audio synthesize waveform
+// These are the same as Teensy Audio synthesize waveform + noise
 #define WAVEFORM_SINE              0
 #define WAVEFORM_SAWTOOTH          1
 #define WAVEFORM_SQUARE            2
@@ -258,6 +279,11 @@
 #define WAVEFORM_SAWTOOTH_REVERSE  6
 #define WAVEFORM_SAMPLE_HOLD       7
 #define WAVEFORM_TRIANGLE_VARIABLE 8
+#define NOISE                      9
+
+// Signal generators can display volts or power into 50 Ohms
+#define VOLTS 0
+#define POWER 1
 
 void tNothing(void);       // Declarations are required to reference function
 void tToInstrumentHome(void); //   by pointer, just like C
@@ -316,7 +342,7 @@ void (*t[22][6])(void) =
   tToASA, tToASAFreq, tToASAFreq, tNothing, tNothing, tNothing,                 // 13 ASA Freq
   tToASA, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tDoHelp,  // 14 ASA Amplitude
   tToInstrumentHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,              // 15 ASG Home
-  tToASGHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,                     // 16 ASG N 
+  tToASGHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,                     // 16 ASG N
   tToInstrumentHome, tToVVM, tToVVM, tToVVM, tNothing, tNothing,                // 17 VVM Home
   tToInstrumentHome, tTouchCal, tVInCal, tVOutCal, tNothing, tNothing,          // 18 Service
   tNothing, tNothing, tNothing, tNothing, tNothing, tNothing,                   // 19 Touch Cal
@@ -338,13 +364,15 @@ XPT2046_Touchscreen ts(T_CS_PIN, TIRQ_PIN);  // Param 2 - Touch IRQ Pin - interr
 //Audio objects          instance name
 //Added for 4-channel sig gen
 AudioSynthWaveform       sgWaveform[4];
+AudioSynthNoiseGaussian  noise1;
 AudioMixer4              mixer1;          // Combine 4 waveforms
 AudioMixer4              mixer2;          // Add waveforms to AVNA source
 AudioConnection          patchCordp(sgWaveform[0], 0, mixer1, 0);
 AudioConnection          patchCordq(sgWaveform[1], 0, mixer1, 1);
 AudioConnection          patchCordr(sgWaveform[2], 0, mixer1, 2);
-AudioConnection          patchCords(sgWaveform[3], 0, mixer1, 3);
-AudioConnection          patchCordt(mixer1,      0, mixer2, 0);
+//AudioConnection          patchCords(sgWaveform[3], 0, mixer1, 3);
+AudioConnection          patchCords(noise1,        0, mixer1, 3);
+AudioConnection          patchCordt(mixer1,        0, mixer2, 0);
 // Regular AVNA objects
 AudioControlSGTL5000     audioShield;
 AudioInputI2S            audioInput;      // Measurement signal
@@ -438,7 +466,7 @@ struct measureFreq {
   float    freqHz;            // Requested frequency (display freq, also)
   float    freqHzActual;      // Achieved frequency (used in line 2 data)
   uint16_t numTenths;
-  double   vRatio;            // Vor/Vom magnitudes 
+  double   vRatio;            // Vor/Vom magnitudes
   double   dPhase;            // phaseor - phaseom
   double   thruRefAmpl;       // Keep these 4 as double for historic (EEPROM) reasons
   double   thruRefPhase;
@@ -527,9 +555,9 @@ struct sigGen {  // Structure defined here.  See EEPROM save for asg[]
 } asg[4] = {
     1030.0f,  0.2828f, false, WAVEFORM_SINE,
     1400.0f,  0.05f,   false, WAVEFORM_SINE,
-    5000.0f,   0.0f,   false, WAVEFORM_SINE,
-    200.0f,    0.0f,   false, WAVEFORM_SQUARE};
- 
+    5000.0f,  0.0f,    false, WAVEFORM_SQUARE,
+    22000.0f, 0.1f,    false, NOISE};
+
 
 //          ----------------------------------------------------------
 // Data to be saved when updated and used at power up.
@@ -573,7 +601,7 @@ struct saveState {
   float32_t sgCal;  // 1.5792f;
   float32_t VVMCalConstant;    // 0.0000137798f;
   float32_t SAcalCorrectionDB; // 4.5f;
-  }; 
+  };
 
 // Set up a union of bytes that allow EEPROM storage of VNA state when turned off. Init goes with
 // first member
@@ -631,9 +659,9 @@ uint16_t lcdMenu[22][6]    // Select next as 0 to 6. Indices are [current menu][
     15, 16, 16, 16, 16, 16,  // Menu 16 Signal Generator N
      0, 17, 17, 17, 17, 17,  // Menu 17 Vector Voltmeter
      0, 19, 20, 21, 18, 18,  // Menu 18 Service
-    18, 19, 19, 19, 19, 19,  // Menu 19 Touch Cal 
-    18, 20, 20, 20, 20, 18,  // Menu 20 V In Cal 
-    18, 21, 21, 21, 21, 18   // Menu 21 V Out Cal 
+    18, 19, 19, 19, 19, 19,  // Menu 19 Touch Cal
+    18, 20, 20, 20, 20, 18,  // Menu 20 V In Cal
+    18, 21, 21, 21, 21, 18   // Menu 21 V Out Cal
     };
 
 uint16_t nSampleRate = S100K;     // Current rate,  1 is S44117 or 44711.65Hz rate
@@ -681,7 +709,7 @@ boolean wastouched = true;  // Touch screen
 boolean whatUseLF = true;   // Use 10, 20, 50 Hz for What? (speed up)
 // Note - Screen corner data is  with EEPROM
 
-// The level of waveforms is (0.0, 1.0) but the amplitude for the sig gens 
+// The level of waveforms is (0.0, 1.0) but the amplitude for the sig gens
 // is 0 to 1.22 Volts p-p.  sgCal converts between these. (make settable?)
 //  float32_t sgCal = 1.5792f;   With EEPROM Data
 int16_t currentSigGen = 0;  // Ranges (0,3)
@@ -709,6 +737,9 @@ char *lUnits[7]={(char*)"pH", (char*)"nH", (char*)"uH", (char*)"mH", (char*)" H"
 char *cUnits[7]={(char*)"pF", (char*)"nF", (char*)"uF", (char*)"mF", (char*)" F", (char*)"kF", (char*)"MF"};
 
 unsigned long tms;
+
+// Variables for Signal Generators
+int16_t sigGenUnits = VOLTS;
 
 // Variables added with the Spectrum Analyzer
 int16_t pixelnew[256];
@@ -768,8 +799,6 @@ namespace std {
     Serial.println(e);  while(1);
   }
 }
-// ====================================================================================
-
 
 // ==============================  SETUP  =============================================
 void setup()
@@ -783,6 +812,7 @@ void setup()
   panelLED(LRED);
   Serial.begin(9600);     // 9600 is not used, it is always 12E6
   delay(1000);            //Wait for USB serial
+
   // X.reserve(nn) immediately sets memory for nn X-elements.
   Z.reserve(201);
   Y.reserve(201);
@@ -894,7 +924,7 @@ void setup()
     6: 1.11 Volts p-p
     7: 0.94 Volts p-p  More gain
     8: 0.79 Volts p-p   is lower
-    9: 0.67 Volts p-p     |
+    9: 0.67 Volts p-p      |
     10: 0.56 Volts p-p     |
     11: 0.48 Volts p-p     V
     12: 0.40 Volts p-p
@@ -920,7 +950,7 @@ void setup()
   AudioInterrupts();
   DC1.amplitude(dacLevel);                          // Gain control for DAC output
   //factorFreq is global that corrects any call involving absolute frequency, like waveform generation.
-  factorFreq = FBASE / sampleRateExact;    // 44117.65f / 
+  factorFreq = FBASE / sampleRateExact;    // 44117.65f /
   // Setup callbacks for SerialCommand commands
 
   // Configure the ASA window algorithm to use
@@ -982,6 +1012,9 @@ void setup()
   totalDataPoints = 101;   // If nanoVNA-saver needs data before measuring
   sweepPoints=101;
   sweepCurrentPoint = 1602; // Not measuring
+  
+  // Initialize AVNA
+  prepMeasure(FreqData[0].freqHz);
 
   // For VVM
   saveFreq0 = FreqData[0].freqHz;
@@ -995,9 +1028,9 @@ void setup()
       dataImTrans[i]=0.5;
       }
 
-  // Initialize the four signal generators synth_waveform 
+  // Initialize the three signal generators synth_waveform
   // via "begin(float t_amp, float t_freq, short t_type)"
-  for (unsigned int ii = 0; ii<4; ii++)
+  for (unsigned int ii = 0; ii<3; ii++)
     {
     sgWaveform[ii].begin(uSave.lastState.sgCal*asg[ii].amplitude, asg[ii].freq, asg[ii].type);
     // and the on/off is set by the mixer1 via "void gain(unsigned int channel, float gain)"
@@ -1006,6 +1039,8 @@ void setup()
     else
       mixer1.gain(ii, 0.0f);
     }
+  noise1.amplitude(0.0f);       // Fourth generator is noise, set now to zero.
+  mixer1.gain(3, 0.0f);         // and not enabled, either
 
   // The following sets up serial port 4, 9600 baud RS-232 control of the AVNA using comands from the
   // nanoVNA.  This is compatible with using the following for control:
@@ -1023,7 +1058,6 @@ void setup()
 // =====================================  LOOP  ============================================
 void loop()
   {
-  int16_t cmdResult;
   char inChar;
   uint16_t boxNum;
 
@@ -1052,7 +1086,7 @@ void loop()
     // if(cmdResult == 1)  HWSERIAL4.println("What cmd?");
     // if(cmdResult == 2)  HWSERIAL4.println("OK");
     }
- 
+
   if (instrument == ASA)
     doFFT();
 
@@ -1230,7 +1264,7 @@ void loop()
     delay(150);  // Reduces multiple touches on an intended one
     }    // End, screen was touched
 
- //if( rms1.available() ) 
+ //if( rms1.available() )
  //   { Serial.println(rms1.read(), 4); delay(500); }
 
   if(doRun == POWER_SWEEP)
@@ -1507,7 +1541,7 @@ void loadStateEEPROM(void)
     Serial.print("EEPROM Load of "); Serial.print(sizeof(saveState)); Serial.println(" bytes");
   }
 
-/* prepMeasure(float freq)  -  Does steps neede to make the data structure
+/* prepMeasure(float freq)  -  Does steps needed to make the data structure
  * FreqData[0] ready to do a measurement.  NOT for FreqData 1 to 13; those are direct from table.
  * nFreq = 0 must be set before this is called.
  *  1-Find the freqHzActual frequency, range 10 to 40,000 Hz
@@ -1570,7 +1604,6 @@ Serial.println(FreqData[0].numTenths);
 // to frequency index iF.  Assumes that useUSB is in effect
 void serialPrintZ(uint16_t iF)
   {
-  float rcamp, rcphase;
   Complex Zo(uSave.lastState.valueRRef[uSave.lastState.iRefR], 0.0);
 
   ReflCoeff = (Z[iF] - Zo) / (Z[iF] + Zo);

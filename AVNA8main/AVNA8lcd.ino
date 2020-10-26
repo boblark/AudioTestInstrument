@@ -447,10 +447,7 @@ void topLine2a(void)
  *                  hexScreenRequest         Send BMP file over USB serial
  */
 void dumpScreenToSD(void) {
-  uint16_t colorPixel;
   uint8_t r, g, b;
-  uint16_t x = 0;
-  uint16_t y = 0;
   const uint16_t width = 320;
   const uint16_t height = 240;
   const uint16_t linesize = 3 * width;
@@ -486,19 +483,19 @@ void dumpScreenToSD(void) {
    * } kludgeFrame;
    */
   struct xBITMAPINFOHEADER
-  {
-  uint32_t biSize;         // size of this struct
-  int32_t  biWidth;        // bmap width in pixels
-  int32_t  biHeight;       // bmap height in pixels
-  uint16_t biPlanes;       // numplanes - always 1
-  uint16_t biBitCount;     // bits per pixel
-  uint32_t biCompression;  // compression flag
-  uint32_t biSizeImage;    // image size in bytes
-  int32_t  biXPelsPerMeter; // horz resolution
-  int32_t  biYPelsPerMeter; // vert resolution
-  uint32_t biClrUsed;      // 0 -> color table size
-  uint32_t biClrImportant; // important color count
-  };
+    {
+    uint32_t biSize;         // size of this struct
+    int32_t  biWidth;        // bmap width in pixels
+    int32_t  biHeight;       // bmap height in pixels
+    uint16_t biPlanes;       // numplanes - always 1
+    uint16_t biBitCount;     // bits per pixel
+    uint32_t biCompression;  // compression flag
+    uint32_t biSizeImage;    // image size in bytes
+    int32_t  biXPelsPerMeter; // horz resolution
+    int32_t  biYPelsPerMeter; // vert resolution
+    uint32_t biClrUsed;      // 0 -> color table size
+    uint32_t biClrImportant; // important color count
+    };
 
   union ih_data {
   struct xBITMAPINFOHEADER ih;
@@ -535,10 +532,10 @@ void dumpScreenToSD(void) {
     }
 
   //Format file header and write
-  bmpfileheader[2] = (filesize);
-  bmpfileheader[3] = (filesize>>8);
-  bmpfileheader[4] = (filesize>>16);
-  bmpfileheader[5] = (filesize>>24);
+  bmpfileheader[2] = (unsigned char)filesize;
+  bmpfileheader[3] = (unsigned char)(filesize>>8);
+  bmpfileheader[4] = (unsigned char)(filesize>>16);
+  bmpfileheader[5] = (unsigned char)(filesize>>24);
   if(SDCardAvailable && bmpScreenSDCardRequest)
     bmpFile.write(bmpfileheader, sizeof(bmpfileheader));
   if(hexScreenRequest)
