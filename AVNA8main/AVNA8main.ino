@@ -770,12 +770,12 @@ struct frequencyData {
     float signalFreq;   // For Distortion, SINAD, etc
     uint16_t signalBin;
 } freqASA[6] = {
-    6000.0f, S6K, 2.5f, "6 kHz", 16, 996.094, 170,
+    6000.0f, S6K, 2.5f, "6 kHz", 8, 996.094, 170,
     12000.0f, S12K, 5.0f, "12 kHz", 16, 996.094, 85,
-    24000.0f, S24K, 10.0f, "24 kHz", 32, 1992.19, 85,
-    48000.0f, S48K, 20.0f, "48 kHz", 64, 3984.375, 85,
-    96000.0f, S96K, 40.0f, "96 kHz", 128, 7968.75, 85,
-    192000.0f, S192K, 80.0f, "192 kHz", 200, 15937.5, 85};
+    24000.0f, S24K, 10.0f, "24 kHz", 16, 1992.19, 85,
+    48000.0f, S48K, 20.0f, "48 kHz", 16, 3984.375, 85,
+    96000.0f, S96K, 40.0f, "96 kHz", 16, 7968.75, 85,
+    192000.0f, S192K, 80.0f, "192 kHz", 32, 15937.5, 85};
 
 float pwr10, pwr10DB;
 float sinadNoisePower, sinadSignalPower, signalOnlyPower;
