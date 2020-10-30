@@ -1,9 +1,9 @@
 //  AVNA8ASA.ino
 // Routines associated with The Spectrum Analyzer part of the
-// AVNA audio vector analyzer. 
+// AVNA audio vector analyzer.
 /*  RSL_VNA8 Arduino sketch for audio VNA measurements.
  *  Copyright (c) 2016-2020 Robert Larkin  W7PUA
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -25,7 +25,7 @@
 void doFFT(void)
   {
   float32_t specDB, pTemp;
-  static uint16_t countMax = 100;  //  Make global and user adjustable
+  static uint16_t countMax = 10;  //  Make global and user adjustable
   static uint16_t countAve = 0;
   float32_t aveFactorDB;
   static float32_t avePower[512];
@@ -34,14 +34,16 @@ void doFFT(void)
 
   if (fft1024p.available())
     {
-    aveFactorDB = 10.0f*log10f(countMax);
+ //   aveFactorDB = 10.0f*log10f(countMax);
+    aveFactorDB = 10.0f*log10f((float)freqASA[ASAI2SFreqIndex].SAnAve);
     specMax = -200.0f;
     for (int ii=0; ii<512; ii++)
       {
       avePower[ii] += fft1024p.read(ii);   // Power average, 0.0 for sine wave full scale down to -80 or so
       }
 
-    if(++countAve == countMax)  // Averaging is compete, get info and plot
+//    if(++countAve == countMax)  // Averaging is compete, get info and plot
+      if(++countAve >= freqASA[ASAI2SFreqIndex].SAnAve)
       {
       specMax = 0.0f; iiMax = 0;
       for(int ii=0; ii<512; ii++)
@@ -83,19 +85,40 @@ void doFFT(void)
       vc = sqrtf(avePower[iiMax]);
       if (iiMax < 511)
         vp = sqrtf(avePower[iiMax + 1]);
-      if(iiMax<2) 
+      if(iiMax<2)
         specMaxFreq = 0.0f;  // DC term is problematic.  Reduce sample rate for low frequencies.
       else if(vp > vm)
         {
         R = vc/vp;
         // 0.05 Hz upward error makes display more readable
-        specMaxFreq = 0.05 + ( (float32_t)iiMax + (2-R)/(1+R) )*freqASA[ASAI2SFreqIndex].sampleRate/1024.0f;
+        specMaxFreq = 0.05f + ( (float32_t)iiMax + (2-R)/(1+R) )*freqASA[ASAI2SFreqIndex].sampleRate/1024.0f;
         }
       else if(iiMax==511 || vp < vm)
         {
         R = vc/vm;
-        specMaxFreq = 0.05 + ( (float32_t)iiMax - (2-R)/(1+R) )*freqASA[ASAI2SFreqIndex].sampleRate/1024.0f;
+        specMaxFreq = 0.05f + ( (float32_t)iiMax - (2-R)/(1+R) )*freqASA[ASAI2SFreqIndex].sampleRate/1024.0f;
         }
+
+
+
+      /* SINAD & Distortion Analysis use the SA with sample rate of 12KHz.  This gives bin spacing of
+       * 11.71875 Hz.  The bin85 is at 996.094 and will be used as notch center.  Notch out
+       * 5 bins and add the center 3 together as signal.  Cut the bottom off at 300 Hz (bin26 is 305)
+       * and at 4kHz (bin 342 is 4008 Hz).  That includes the 4th harmonic for SINAD purposes.
+       */
+      sinadNoisePower = 0.0f;           // Denominator for S/N and SINAD
+      for(int ii=26;  ii<83;  ii++)     // Omit edges, 57 bins here
+         sinadNoisePower += avePower[ii];
+      for(int ii=88;  ii<343;  ii++)    // 4 kHz top, 255 bins here
+         sinadNoisePower += avePower[ii];
+      sinadNoisePowerDB = 10.0f*log10f(sinadNoisePower);
+      signalOnlyPower = avePower[84] + avePower[85] + avePower[86];  // S/N numerator
+      signalOnlyPowerDB = 10.0f*log10f(signalOnlyPower);
+      // Interestingly, SINAD numerator is sig+noise+distortion
+      sinadSignalPower = sinadNoisePower + signalOnlyPower;
+      sinadSignalPowerDB = 10*log10f(sinadSignalPower);
+
+ // Serial.print(sinadNoisePowerDB, 3);  Serial.print(" <--Noise  Signal--> "); Serial.println(sinadSignalPowerDB, 3);
 
       // Find x-y  for spectral plot
       for(int ii=0; ii<255; ii++)
@@ -121,8 +144,9 @@ void doFFT(void)
     }  // End, if fft available
   }
 
-void prepSpectralDisplay(void) 
+void prepSpectralDisplay(void)
   {
+  tft.fillRect(0, 0, 320, 200, ILI9341_BLACK);
   //Annotate the y-axis
   tft.setTextColor(ILI9341_WHITE);
   tft.setFont(Arial_10);
@@ -261,5 +285,39 @@ void show_spectrum()
       tft.print(" ---");
     for(int ii=0; ii<256; ii++)
         pixelold[ii] = pixelnew[ii];
+    if(sinadOn) {
+      tft.setTextColor(ILI9341_WHITE);
+      tft.setFont(Arial_8);
+      tft.setCursor(240, 36);
+      tft.print("fc = 996");
+
+      tft.setCursor(240, 46);
+      tft.print("S/N=");
+      tft.setCursor(275, 46);
+      tft.print((signalOnlyPowerDB - sinadNoisePowerDB + 20.214), 1);
+
+      tft.setCursor(240, 56);
+      tft.print("NBW = 17.6");  // 12 kHz sample rate
+      tft.setCursor(275, 56);
+
+      tft.setCursor(240, 66);
+      tft.print("S/N 2500Hz");
+      // NBW for 1 bin is 17.6 Hz, so lower by (2500/17.6) in dB
+      tft.setCursor(275, 76);
+      tft.print((signalOnlyPowerDB - sinadNoisePowerDB + 20.214 - 21.53), 1);
+
+      tft.setCursor(240, 86);
+      tft.print("SINAD");
+      tft.setCursor(275, 86);
+      tft.print((sinadSignalPowerDB - sinadNoisePowerDB - 0.042), 1);
+      
+      tft.drawFastHLine (spectrum_x+13, spectrum_y+158,  28, ILI9341_GREEN);
+      tft.drawFastHLine (spectrum_x+41, spectrum_y+158,  4, ILI9341_RED);
+      tft.drawFastHLine (spectrum_x+45, spectrum_y+158,  128, ILI9341_GREEN);
+        
+      tft.drawFastHLine (spectrum_x+13, spectrum_y+159,  28, ILI9341_GREEN);
+      tft.drawFastHLine (spectrum_x+41, spectrum_y+159,  4, ILI9341_RED);
+      tft.drawFastHLine (spectrum_x+45, spectrum_y+159,  128, ILI9341_GREEN);
+    }
   } // End show_spectrum()
 

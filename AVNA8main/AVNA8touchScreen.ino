@@ -27,7 +27,7 @@ void tToInstrumentHome(void)
   {
   tft.fillRect(0, 0, 320, 200, ILI9341_BLACK);
   topLine1();  topLine2();
-  instrument = AVNA;
+  instrument = ALL_IDLE;
   avnaState = 0;
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
@@ -54,6 +54,7 @@ void tToInstrumentHome(void)
 
 void tService(void)
   {
+  instrument = ALL_IDLE;
   if(SDCardAvailable)
     drawScreenSaveBox(ILI9341_GREEN);
   else
@@ -374,10 +375,6 @@ void tToAVNAHome(void)
 // always on when the ASA or VVM instruments are on.
 void tToASGHome(void)
   {
-  //mixer2.gain(0, 1.0);   // Turn on signal generatrs
-  //mixer2.gain(1, 0.0);   // Turn off AVNA source signal
- // setRefR(R50);          // 50 Ohm output
-  //setSwitch(TRANSMISSION_37);        // Connect for T measure
   setSigGens();
 
   tft.fillRect(0, 0, tft.width(), 200, ILI9341_BLACK);
@@ -458,7 +455,7 @@ void tToASGn(void)
       {
       case 1: asg[currentSigGen].ASGoutputOn = true;  break;
       case 2: asg[currentSigGen].ASGoutputOn = false;  break;
-      case 3: 
+      case 3:
         if(currentSigGen != 3)  // 3 is a noise gen
           asg[currentSigGen].type = WAVEFORM_SINE;
         break;
@@ -490,9 +487,10 @@ void tToASGn(void)
 
   tft.setCursor(8, 57);
   if(currentSigGen==3)
-    tft.print("LPF");
+    ;  //  tft.print("LPF");  TEMP til filter is fixed
   else
     tft.print("Freq");
+
 
   tft.setCursor(270, 57);
   tft.print("Hz");
@@ -502,27 +500,26 @@ void tToASGn(void)
 
   // Lower right hand annotation
   tft.fillRect(230, 137, 90, 60, ILI9341_BLACK);
-  
+
   tft.setCursor(230, 137);
   if(sigGenUnits == VOLTS)
     {
 
     if(currentSigGen==3)
       {
-	  tft.print("V into 50R");
+      tft.print("V into 50R");
       tft.setCursor(240, 159);
       tft.print("1-sigma");
       }
     else
       {
-	  tft.print("V p-p");
-	  tft.setCursor(240, 159);
+      tft.print("V p-p");
+      tft.setCursor(240, 159);
       tft.print("into 50 R");
       }
-      
     }
   // else power units
-    
+
  /* Touch screen
   * Frequency Up   y = 27 to 52 pixel
   * Frequency Down y = 75 to 100 pixel
@@ -542,7 +539,7 @@ void tToASGn(void)
   tft.setCursor(95, 142);
   tft.setFont(Arial_18);
   tft.print(".");
-    
+
   boxes7(4, 165);
 
   tft.setTextColor(ILI9341_YELLOW);
@@ -554,7 +551,9 @@ void tToASGn(void)
     tft.print("Square");
   else if (asg[currentSigGen].type == NOISE)
     tft.print("GWN");
-  checkSGoverload(); 
+
+ if(currentSigGen==3) tft.fillRect(0, 25, tft.width(), 75, ILI9341_BLACK); // TEMP for no LPF
+  checkSGoverload();
   setSigGens();
   }
 
@@ -566,15 +565,24 @@ void checkSGoverload(void)
     if(asg[jj].ASGoutputOn)
       sumVolts += asg[jj].amplitude;
     }
+  if (instrument==ASA)
+   tft.fillRect(15, 0, 60, 15, ILI9341_BLACK);
   if(sumVolts >= 1.2f)
     {
     tft.setTextColor(ILI9341_RED);
     tft.setFont(Arial_12);
     tft.setCursor(230, 183);
     tft.print("OVERLOAD");
+    if (instrument==ASA) {
+      tft.setCursor(15, 0);
+      tft.print("OVERLOAD");
+      }
     }
+
+
   }
 
+// Set frequency, on/off and amplitude of 3 sig gens plus 1 noise gen
 void setSigGens(void)
   {
   // Initialize the three signal generators synth_waveform
@@ -584,15 +592,17 @@ void setSigGens(void)
   setRefR(R50);          // 50 Ohm output
   setSwitch(TRANSMISSION_37);        // Connect for T measure
   for (unsigned int ii = 0; ii<3; ii++)
-    sgWaveform[ii].begin(uSave.lastState.sgCal*asg[ii].amplitude, factorFreq*asg[ii].freq, asg[ii].type);   
+    sgWaveform[ii].begin(uSave.lastState.sgCal*asg[ii].amplitude, factorFreq*asg[ii].freq, asg[ii].type);
   for (unsigned int ii = 0; ii<4; ii++)
     {
-    // and the on/off is set by the mixer1 via "void gain(unsigned int channel, float gain)"
+    // and the on/off is set by the mixer1 via "void mixer1.gain(unsigned int channel, float gain)"
     if (asg[ii].ASGoutputOn)
       mixer1.gain(ii, 1.0f);
     else
       mixer1.gain(ii, 0.0f);
     }
+  noise1.amplitude(asg[3].amplitude);
+  noise1.setLowPass(factorFreq*asg[3].freq);
   }
 
 void tToAVNA(void)
@@ -651,7 +661,8 @@ void tToVVM(void)
   //mixer2.gain(0, 1.0f);   // Turn on signal generators
   //mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
   instrument = VVM;
-
+  mixer2.gain(0, 1.0f);   // Turn on 4x signal generatrs
+  mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
   tft.fillRect(0, 0, tft.width(), 200, ILI9341_BLACK);
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_14);
@@ -707,8 +718,8 @@ void tToVVM(void)
   tft.print(".");
   if (phaseOffset < 0.0f)
     {
-	tft.setCursor(60, 142);
-	tft.print("-");
+    tft.setCursor(60, 142);
+    tft.print("-");
     }
   boxes7(4, 165);
 
@@ -784,10 +795,10 @@ void tToASA(void)
     beenHere = true;
     ASAI2SFreqIndex = 4;  // 96 kHz
     }
-  mixer2.gain(0, 1.0f);   // Turn on signal generatrs  <<  NEEDS ASSORTED Sig Gen <<<<<<<<<<<<<<<<<<<
-  mixer2.gain(3, 1.0f);   // Turn on noise generators
-  mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
   instrument = ASA;
+  mixer2.gain(0, 1.0f);   // Turn on 4x signal generatrs
+  mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
+
   setSwitch(TRANSMISSION_37);
   DC1.amplitude(0.0);   // (dacLevel);
   tft.fillScreen(ILI9341_BLACK);
@@ -803,13 +814,18 @@ void tToASA(void)
 
 void tToASAFreq(void)
   {
-      instrument = ASA_IDLE;
+  instrument = ASA_IDLE;
   // 192 kHz sample rate runs out of power and has spectral errors.
   // Allow up to 96 kHz
   if((currentMenu == 13 ) && (menuItem == 1) && (ASAI2SFreqIndex<4))
       ASAI2SFreqIndex++;
   if((currentMenu == 13 ) && (menuItem == 2) && (ASAI2SFreqIndex>0))
       ASAI2SFreqIndex--;
+  if((currentMenu == 13 ) && (menuItem == 3))
+        freqASA[ASAI2SFreqIndex].SAnAve *= 2;
+  if( (currentMenu == 13 ) && (menuItem == 4) && (freqASA[ASAI2SFreqIndex].SAnAve >= 4) )
+        freqASA[ASAI2SFreqIndex].SAnAve /= 2;
+  
   setSample(freqASA[ASAI2SFreqIndex].rateIndex);
   countMax = freqASA[ASAI2SFreqIndex].SAnAve;
   tft.fillRect(0, 38, tft.width(), 200, ILI9341_BLACK);
@@ -834,7 +850,7 @@ void tToASAFreq(void)
   tft.setCursor(20, 164);
     tft.print("Samples per Update");
   tft.setCursor(220, 164);
-  tft.print(freqASA[ASAI2SFreqIndex].SAnAve);   // Incl Hann window effects
+  tft.print(freqASA[ASAI2SFreqIndex].SAnAve); 
   }
 
 void tToASAAmplitude(void)
@@ -875,6 +891,26 @@ void tToASAAmplitude(void)
   tft.setFont(Arial_16);
   tft.print(ASAdbOffset,2  );
   }
+
+void tToASASinad(void) {
+  if(sinadOn) {     // So, we turning Sinad off
+    sinadOn = false;
+    ASAI2SFreqIndex = sinadLastRate; // restore
+    setSample(ASAI2SFreqIndex);
+    prepSpectralDisplay();
+    show_spectrum();
+    }
+  else {
+    sinadOn = true;
+    sinadLastRate = ASAI2SFreqIndex;  // Save for restore
+    ASAI2SFreqIndex = S12K;
+    setSample(ASAI2SFreqIndex);
+    prepSpectralDisplay();
+    show_spectrum();
+    }
+
+uint16_t sinadLastRate = S96K;
+}
 
 // This may be extreme, but does the job.  Clears reference to data
 // that may be out of date.
@@ -1493,20 +1529,20 @@ void boxes7(uint16_t nBox, int16_t yTop)
   {
   switch (nBox)
     {
-	case 4:
-	  tft.fillRect(60, yTop+1, 160, 25, ILI9341_BLACK);
+    case 4:
+      tft.fillRect(60, yTop+1, 160, 25, ILI9341_BLACK);
       for (int ii=1; ii<5; ii++)
         tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
       break;
 
     case 5:
-	  tft.fillRect(60, yTop+1, 200, 25, ILI9341_BLACK);
+      tft.fillRect(60, yTop+1, 200, 25, ILI9341_BLACK);
       for (int ii=1; ii<6; ii++)
         tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
       break;
 
     case 7:
-	  tft.fillRect(20, yTop+1, 280, 25, ILI9341_BLACK);
+      tft.fillRect(20, yTop+1, 280, 25, ILI9341_BLACK);
       for (int ii=0; ii<8; ii++)
         tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
       break;
@@ -1531,24 +1567,24 @@ void boxes7(uint16_t nBox, int16_t yTop)
    digitPosition = nDigits;  // Work right to left
    if(num==0 && !printLeadingZeros)
      {
-	 tft.setCursor(xLeft + (nDigits - 1)*40, yTop);
-	 tft.print("0");
-	 }
+     tft.setCursor(xLeft + (nDigits - 1)*40, yTop);
+     tft.print("0");
+     }
    else
      {
      for(int ii=0; ii<nDigits; ii++)
        {
-	   nm = num - 10*(num/10);
-	   num = num/10;
-	   //print nm
-	   tft.setCursor(xLeft + (nDigits - ii - 1)*40, yTop);
+       nm = num - 10*(num/10);
+       num = num/10;
+       //print nm
+       tft.setCursor(xLeft + (nDigits - ii - 1)*40, yTop);
        if(nm>0 || num>0 || printLeadingZeros)
          tft.print(nm, 1);
        else
          tft.print(" ");
 
-	   if(--digitPosition < 0)
-   	     break;
+       if(--digitPosition < 0)
+         break;
        }
      }
    }
@@ -1570,10 +1606,10 @@ void writeMenus(uint16_t nMenu)
     " Back", " ", " ", " ", "  Cal", " Meas",                    // Set 9
     " Back", "Disp Frq", "Disp Frq", " ", "  Cal", " Single",    // Set 10
     " Back", "Disp Frq", "Disp Frq", " ", "  Cal", " Single",    // Set 11
-    "Instrmnt", " Freq", "Amplitde", " ", " ", " ",              // Set 12 ASA Home
-    " Back", "Max Freq", "Max Freq", " ", " ", " ",              // Set 13 ASA Freq
+    "Instrmnt", " Freq", "Amplitde", " SINAD ", " ", " ",        // Set 12 ASA Home
+    " Back", "Max Freq", "Max Freq", "Samples", "Samples ", " ", // Set 13 ASA Freq
     " Back", " dB/div", " dB/div", " Offset ", " Offset ", " ",  // Set 14 ASA Amplitude
-    "Instrmnt", " SigGen", " SigGen", " SigGen", "NoiseGen", " ", // Set 15 ASG Home
+    "Instrmnt", " SigGen", " SigGen", " SigGen", "NoiseGen", " ",// Set 15 ASG Home
     " Back", "Sig Gen", "Sig Gen", "  Sine ", " Square ", " ",   // Set 16 ASG 1 to 4
     " Back", " Reset", " Volts", "  dBm   ", "   ", " ",         // Set 17 VVM
     "Instrmnt", " Touch", "V Input", "V Output", " ", " ",       // Set 18 Service
@@ -1582,7 +1618,7 @@ void writeMenus(uint16_t nMenu)
     "   Cal", " Measure", " ", " ", "  ", " Cancel"              // Set 21 Output V Cal
     };
   static char line2[22][6][9]={
-    " ", " ", " VMeter", "Anal", "  Gens", " & Cal ",
+    " ", " ", " VMeter", "Analyzer", "  Gens", " & Cal ",
     " Home", "  Freq", " ", "   ?", " Ref R", " ",
     " ", "  Down", "   Up", "    0", "    Z", "    T",
     " ", "  Down", "   Up", " ", "    Z", "    T",
@@ -1594,8 +1630,8 @@ void writeMenus(uint16_t nMenu)
     " ", " ", " ", " ", " ", "    T",
     " ", "  Down", "   Up", " ", " ", "T Sweep",
     " ", "  Down", "   Up", " ", " ", "Z Sweep",
-    " Home", " ", " ", " ", " ", " ",
-    " ", "   Up ", "  Down ", " ", " ", " ",
+    " Home", " ", " ", " Toggle ", " ", " ",
+    " ", "   Up ", "  Down ", "   Up", "  Down ", " ",
     " ", "   Up ", "  Down ", "    Up ", "  Down ", " ",
     " Home", "    1", "    2", "    3", "    4", " ",
     " ", "  ON", "  OFF", " Wave ", " Wave ", " ",

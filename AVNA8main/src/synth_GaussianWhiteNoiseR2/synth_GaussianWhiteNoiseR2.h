@@ -88,6 +88,7 @@ public:
         if (sd<0.0)  sd=0.0;
     }
 
+    // This is for FUTURE.  It computes the IIR LPF if called, but NOT USED in update.
     // IIR BiQuad coefficients, See Teensy Audio Library and
     // http://www.musicdsp.org/files/Audio-EQ-Cookbook.txt
     void setLowPass(float frequency) {

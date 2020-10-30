@@ -26,7 +26,7 @@
 // See the following for details
 #include "synth_GaussianWhiteNoiseR2.h"
 
-void AudioSynthNoiseGaussian::update(void) {  
+void AudioSynthNoiseGaussian::update(void) {
 #define ABS(X)   ((X>=0)? X : -(X) )
 #define ROUND(X) (X>=0)? (int) (X + 0.5) : (int)-(ABS(X) +0.5)
 
@@ -35,6 +35,9 @@ void AudioSynthNoiseGaussian::update(void) {
     float rdev = 0.0f;
     float gwn_f32, y_f32;
     int16_t* pd;
+
+ uint32_t xxpm;
+ uint32_t xxpm2;
 
     blockOut = allocate();
     if (!blockOut) return;
@@ -69,7 +72,10 @@ void AudioSynthNoiseGaussian::update(void) {
         // a mean of 0.0, we subtract (12 * 0.5) and then multiply by sd=0.1:
         gwn_f32 = sd*(rdev - 6.0f);
 
-        // 2-pole LP filter for those that want to limit the bandwidth
+
+/*  PROBLEMS HERE -Save for later and do not filter now
+        // 2-pole LP filter for those that want to limit the bandwidth.  Takes about 1.4 uSec
+        // per pass (180 uSec for 128 passes) with doubles on T3.6.  Not bad, but way above that for T4.0.
         if (b0 > 0.95)   // Set frequency near fs/2 and we do no filtering at all
           y_f32 = gwn_f32;
         else
@@ -82,7 +88,10 @@ void AudioSynthNoiseGaussian::update(void) {
           w1 = b1*x0 - a1*yy + w2;        // update to next w1
           w2 = b2*x0 - a2*yy;             // update to next w2
           y_f32 = (float)yy;
-	      }
+          }
+ */
+        y_f32=gwn_f32;
+
         // Convert to 16-bit signed integer
         if (y_f32>0.9999695f)
             *pd++ = 32767;
@@ -90,7 +99,9 @@ void AudioSynthNoiseGaussian::update(void) {
             *pd++ = -32768;
         else
             *pd++ = ROUND(32768.0f*y_f32);  // Convert to int16_t
-    }
+    }    // End, i over all samples
+
+
     transmit(blockOut);
-    release(blockOut); 
+    release(blockOut);                 //  Serial.print(xxpm2);Serial.print(" ");Serial.println(xxpm);
 }

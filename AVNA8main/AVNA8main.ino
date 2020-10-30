@@ -56,7 +56,8 @@
    v0.8.0 Added Vector Voltmeter, Spectrum Analyzer and 4x Sig Generators.  Added calibration for in/out levels
           to support these.  Added screen display of spectrum.  Added digit-bydigit up/down widget.
           Updated EEPROM for these. Fixed double precision constants being read as floats.
-   v0.8.1 Converted sig gen 4 to Gaussian noise gen.
+   v0.8.1 Converted sig gen 4 to Gaussian noise gen.  Created 3 R2 local libraries.  Added S/N and SINAD to ASA.
+          Added variable sample averaging for ASA.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
@@ -118,14 +119,14 @@ LIBRARY SUMMARY fromCompile/Show Compile Detail:
 Multiple libraries were found for "SD.h"
  Used: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD
  Not used: /home/bob/arduino-1.8.13/libraries/SD
-Using library Audio at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Audio 
-Using library SPI at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SPI 
-Using library SD at version 1.2.2 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD 
-Using library SerialFlash at version 0.5 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SerialFlash 
-Using library Wire at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Wire 
-Using library EEPROM at version 2.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/EEPROM 
-Using library XPT2046_Touchscreen at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/XPT2046_Touchscreen 
-Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/ILI9341_t3 
+Using library Audio at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Audio
+Using library SPI at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SPI
+Using library SD at version 1.2.2 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD
+Using library SerialFlash at version 0.5 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SerialFlash
+Using library Wire at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Wire
+Using library EEPROM at version 2.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/EEPROM
+Using library XPT2046_Touchscreen at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/XPT2046_Touchscreen
+Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/ILI9341_t3
 #endif
 
 #include <stdio.h>
@@ -138,6 +139,13 @@ Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hard
 #include <SerialFlash.h>
 #include <EEPROM.h>
 #include <XPT2046_Touchscreen.h>
+/* Starting with ver 0.81, private copies of third party libraries, such a "SerialCommand"
+ * are included in the github repository.  To distinguish these when changes are made to
+ * the distribution libraries, these are appended with "R2" as "SerialCommanR2".  This
+ * allows simple distribution since the github ZIP file contains all the files, in the proper
+ * directories, so that when combined with libraries from the C++ compiler, Arduino and
+ * Teensyduino everything will compile.  The latter three library sources will be found with
+ * only a need for the .h include files shown here.          */
 #include "src/complexR2/complexR2.h"
 #include "src/SerialCommandR2/SerialCommandR2.h"
 #include "src/analyze_fft1024_p/analyze_fft1024_p.h"
@@ -186,7 +194,8 @@ Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hard
 #define LPF2300  1
 #define NUM_VNAF 14
 
-// Defines for Instrument, these are mutually exclusive
+// Defines the Instrument, these are mutually exclusive
+#define ALL_IDLE -9
 #define ASA_IDLE -2
 #define VVM_IDLE -1
 #define AVNA 0
@@ -290,6 +299,7 @@ void tToVVM(void);
 void tToASA(void);
 void tToASAFreq(void);
 void tToASAAmplitude(void);
+void tToASASinad(void);
 void tToASGHome(void);
 void tToASGn(void);
 void tDoSingleFreq(void);
@@ -323,28 +333,28 @@ void tVOutCal(void);
 // 2D array of function pointers to be called when a menu item is touched
 // 15 menus and 6 buttons per menu
 void (*t[22][6])(void) =
-{ tToInstrumentHome, tToAVNA, tToVVM, tToASA, tToASGHome, tService,             // 0 INSTRUMENT HOME
-  tToInstrumentHome, tDoSingleFreq, tDoSweep, tWhatIntro, tDoSettings, tDoHelp, // 1 AVNA Home
-  tToAVNAHome, tFreqDown, tFreqUp, tFreq0, tDoSingleZ, tDoSingleT,              // 2 Single Freq
-  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tDoSweepZ, tDoSweepT,    // 3 Sweep Freq
-  tToAVNAHome, tSet50,  tSet5K, tToAVNAHome, tToAVNAHome, tToAVNAHome,          // 4 Settings
-  tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome, // 5 More Settings
-  tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                 // 6 Help
-  tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                 // 7 More Help
-  tToAVNAHome, tNothing, tNothing, tNoLF, tUseLF, tDoWhatPart,                  // 8 What Component
-  tToAVNAHome, tNothing, tNothing, tNothing, tCalCommand, tDoSingleT,           // 9 Single T
-  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepT,  // 10 Sweep T
-  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepZ,  // 11 Sweep Z
-  tToInstrumentHome,  tToASAFreq, tToASAAmplitude, /*tToASASettings*/ tNothing, tToASGHome, tDoHelp, // 12 ASA
-  tToASA, tToASAFreq, tToASAFreq, tNothing, tNothing, tNothing,                 // 13 ASA Freq
-  tToASA, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tDoHelp,  // 14 ASA Amplitude
-  tToInstrumentHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,              // 15 ASG Home
-  tToASGHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,                     // 16 ASG N
-  tToInstrumentHome, tToVVM, tToVVM, tToVVM, tNothing, tNothing,                // 17 VVM Home
-  tToInstrumentHome, tTouchCal, tVInCal, tVOutCal, tNothing, tNothing,          // 18 Service
-  tNothing, tNothing, tNothing, tNothing, tNothing, tNothing,                   // 19 Touch Cal
-  tService, tVInCal, tNothing, tNothing, tNothing, tService,                    // 20 VIn Cal
-  tService, tVOutCal, tNothing, tNothing, tNothing, tService                    // 21 VOut Cal
+{ tToInstrumentHome, tToAVNA, tToVVM, tToASA, tToASGHome, tService,                    // 0 INSTRUMENT HOME
+  tToInstrumentHome, tDoSingleFreq, tDoSweep, tWhatIntro, tDoSettings, tDoHelp,        // 1 AVNA Home
+  tToAVNAHome, tFreqDown, tFreqUp, tFreq0, tDoSingleZ, tDoSingleT,                     // 2 Single Freq
+  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tDoSweepZ, tDoSweepT,           // 3 Sweep Freq
+  tToAVNAHome, tSet50,  tSet5K, tToAVNAHome, tToAVNAHome, tToAVNAHome,                 // 4 Settings
+  tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome, tToAVNAHome,        // 5 More Settings
+  tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                        // 6 Help
+  tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                        // 7 More Help
+  tToAVNAHome, tNothing, tNothing, tNoLF, tUseLF, tDoWhatPart,                         // 8 What Component
+  tToAVNAHome, tNothing, tNothing, tNothing, tCalCommand, tDoSingleT,                  // 9 Single T
+  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepT,         // 10 Sweep T
+  tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepZ,         // 11 Sweep Z
+  tToInstrumentHome,  tToASAFreq, tToASAAmplitude, tToASASinad, tNothing, tNothing,    // 12 ASA
+  tToASA, tToASAFreq, tToASAFreq, tToASAFreq, tToASAFreq, tNothing,                    // 13 ASA Freq
+  tToASA, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tToASAAmplitude, tDoHelp, // 14 ASA Amplitude
+  tToInstrumentHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,                     // 15 ASG Home
+  tToASGHome, tToASGn, tToASGn, tToASGn, tToASGn, tNothing,                            // 16 ASG N
+  tToInstrumentHome, tToVVM, tToVVM, tToVVM, tNothing, tNothing,                       // 17 VVM Home
+  tToInstrumentHome, tTouchCal, tVInCal, tVOutCal, tNothing, tNothing,                 // 18 Service
+  tNothing, tNothing, tNothing, tNothing, tNothing, tNothing,                          // 19 Touch Cal
+  tService, tVInCal, tNothing, tNothing, tNothing, tService,                           // 20 VIn Cal
+  tService, tVOutCal, tNothing, tNothing, tNothing, tService                           // 21 VOut Cal
 };
 
 //=============================  OBJECTS  ========================================
@@ -359,15 +369,13 @@ ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC, TFT_RST, TFT_MOSI, TFT_SCLK, TFT_MIS
 XPT2046_Touchscreen ts(T_CS_PIN, TIRQ_PIN);  // Param 2 - Touch IRQ Pin - interrupt enabled polling
 
 //Audio objects          instance name
-//Added for 4-channel sig gen
-AudioSynthWaveform       sgWaveform[4];
+AudioSynthWaveform       sgWaveform[4];   //Added for 4-channel; sig gen 3 used now
 AudioSynthNoiseGaussian  noise1;
 AudioMixer4              mixer1;          // Combine 4 waveforms
 AudioMixer4              mixer2;          // Add waveforms to AVNA source
 AudioConnection          patchCordp(sgWaveform[0], 0, mixer1, 0);
 AudioConnection          patchCordq(sgWaveform[1], 0, mixer1, 1);
 AudioConnection          patchCordr(sgWaveform[2], 0, mixer1, 2);
-//AudioConnection          patchCords(sgWaveform[3], 0, mixer1, 3);
 AudioConnection          patchCords(noise1,        0, mixer1, 3);
 AudioConnection          patchCordt(mixer1,        0, mixer2, 0);
 // Regular AVNA objects
@@ -397,7 +405,7 @@ AudioConnection          patchCord4(audioInput, 0, fft1024p, 0);    // Transmiss
 AudioConnection          patchCord0(waveform1, 0, multGainDAC, 0);  // Test signal
 AudioConnection          patchCord0A(DC1, 0,      multGainDAC, 1);  // Set gain
 //Was AudioConnection          patchCord0C(multGainDAC, 0, i2s2, 0);    // Test signal to L output
-AudioConnection          patchCord0C(multGainDAC, 0, mixer2, 1);    // Test signal to L output
+AudioConnection          patchCord0C(multGainDAC, 0, mixer2, 1);
 AudioConnection          patchCord1C(mixer2, 0, i2s2, 0);           // Test signal to L output
 // I-Q multipliers
 AudioConnection          patchCord1(waveform1, 0, mult1, 1);        // In phase LO
@@ -550,11 +558,10 @@ struct sigGen {  // Structure defined here.  See EEPROM save for asg[]
     bool ASGoutputOn;
     short type;
 } asg[4] = {
-    1030.0f,  0.2828f, false, WAVEFORM_SINE,
-    1400.0f,  0.05f,   false, WAVEFORM_SINE,
-    5000.0f,  0.0f,    false, WAVEFORM_SQUARE,
-    40000.0f, 0.1f,    false, NOISE};
-
+    996.094f, 0.2828f,  false, WAVEFORM_SINE,
+    1900.0f,  0.05f,    false, WAVEFORM_SINE,
+    3000.0f,  0.0f,     false, WAVEFORM_SQUARE,
+    40000.0f, 0.1f,     false, NOISE};
 
 //          ----------------------------------------------------------
 // Data to be saved when updated and used at power up.
@@ -760,14 +767,21 @@ struct frequencyData {
     float32_t maxFreq;
     char name[8];
     uint16_t SAnAve;
+    float signalFreq;   // For Distortion, SINAD, etc
+    uint16_t signalBin;
 } freqASA[6] = {
-    6000.0f, S6K, 2.5f, "6 kHz", 16,
-    12000.0f, S12K, 5.0f, "12 kHz", 16,
-    24000.0f, S24K, 10.0f, "24 kHz", 32,
-    48000.0f, S48K, 20.0f, "48 kHz", 64,
-    96000.0f, S96K, 40.0f, "96 kHz", 128,
-    192000.0f, S192K, 80.0f, "192 kHz", 200};
-float32_t pwr10, pwr10DB;
+    6000.0f, S6K, 2.5f, "6 kHz", 16, 996.094, 170,
+    12000.0f, S12K, 5.0f, "12 kHz", 16, 996.094, 85,
+    24000.0f, S24K, 10.0f, "24 kHz", 32, 1992.19, 85,
+    48000.0f, S48K, 20.0f, "48 kHz", 64, 3984.375, 85,
+    96000.0f, S96K, 40.0f, "96 kHz", 128, 7968.75, 85,
+    192000.0f, S192K, 80.0f, "192 kHz", 200, 15937.5, 85};
+
+float pwr10, pwr10DB;
+float sinadNoisePower, sinadSignalPower, signalOnlyPower;
+float sinadNoisePowerDB, sinadSignalPowerDB, signalOnlyPowerDB;
+bool sinadOn = false;
+uint16_t sinadLastRate = S96K;
 // ----------- End Spectrum analyzer variables -------
 
 // Variables to support BMP Screen Saves to SD Card
@@ -780,7 +794,7 @@ File bmpFile;
 Sd2Card card;
 SdVolume volume;
 SdFile root;
-
+unsigned int mmmm;
 //===================================================================================
 // To use STL Vector container, we need to trap some errors.
 // See https://forum.pjrc.com/threads/23467-Using-std-vector  #10 Thanks, davidthings!
@@ -873,8 +887,8 @@ void setup()
   Serial.print("Voltage Check (expect 145 to 175): ");
   Serial.println(analogRead(21));
 
-
 #if 0
+  //    >>>>>>>>>>>>>  SOLVED  <<<<<<<<<<<<<<<<<<<<<<<<<
   // Following deals with a quirk of the Teensy in using double data types.  Contrary to C convention,
   // numbers such as 1.2345678901, or 1.23, are treated as floats, not doubles. To avoid this, the compiler option
   // -fsingle-precision-constant is removed from the Arduino IDE Teensy 3.6 description.
@@ -892,19 +906,12 @@ void setup()
      tft.setCursor(0, 184);
      tft.print("      See Serial Monitor for details.");
      }
-// BELIEVED TO BE SOLVED
+// BELIEVED TO BE SOLVED   ver 0.80
 #endif
-
 
   // Each additional AudioMemory uses 256 bytes of RAM (dynamic memory).
   // This stores 128-16-bit ints.   Dec 16 usage 8
   AudioMemory(35);   // Last seen peaking at 20
-#if 0
-  // Create a synthetic sine wave, for testing
-  // To use this, edit the connections above
-  sinewave.amplitude(0.8);
-  sinewave.frequency(1034.007);
-#endif
   AudioNoInterrupts();     // Use to synchronize all audio
   // Enable the SGTL5000 audio CODEC
   audioShield.enable();
@@ -1009,7 +1016,7 @@ void setup()
   totalDataPoints = 101;   // If nanoVNA-saver needs data before measuring
   sweepPoints=101;
   sweepCurrentPoint = 1602; // Not measuring
-  
+
   // Initialize AVNA
   prepMeasure(FreqData[0].freqHz);
 
@@ -1050,6 +1057,9 @@ void setup()
     Serial.read();
   while( !serInBuffer.isEmpty() )
     serInBuffer.pop();
+
+  instrument = ALL_IDLE;
+  setSample(S96K);                                      mmmm=millis();
   }
 
 // =====================================  LOOP  ============================================
@@ -1057,6 +1067,17 @@ void loop()
   {
   char inChar;
   uint16_t boxNum;
+  bool istouched;
+  bool changeSgSettings;
+  
+  
+  // TEMP  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  static int processPercentCount = 0;  // Let this wrap
+  if( (millis() - mmmm)>1000  &&  ++processPercentCount<3 ) {
+	  Serial.print ("Processor usage, percent = ");
+	  Serial.println( AudioProcessorUsageMax() );
+      mmmm=millis();
+      }
 
   // Serial i/o can come from either the USB Serial or from UART HWSERIAL4 connected to a RS-232 serial.
   // Check if either has data and send all that is available to try to build a command. It is the operator
@@ -1136,15 +1157,18 @@ void loop()
   SDCardAvailable = card.init(SPI_HALF_SPEED, chipSelect);
 
   // TOUCH SCREEN
-  boolean istouched = ts.touched();
-  if (istouched  &&  (millis()-tms) > 150)  // Set repeat rate and de-bounce or T_REPEAT
+  istouched = ts.touched();
+  if (istouched  &&  (millis()-tms) > 250)  // Set repeat rate and de-bounce or T_REPEAT
     {
-    avnaState = 0;     // Stop measurements
-    doRun = RUNNOT;       // Stop measurements
-#if DIAGNOSTICS
-    Serial.println(millis()-tms);
+    // Serial.println(millis()-tms);
     tms = millis();
-#endif
+    
+    if(instrument == AVNA)
+      {
+      avnaState = 0;     // Stop measurements
+      doRun = RUNNOT;       // Stop measurements
+      }
+
     TS_Point p = ts.getPoint();
     /*
     Serial.print("X = "); Serial.print(p.x);
@@ -1152,7 +1176,7 @@ void loop()
     Serial.print("\tPressure = "); Serial.println(p.z);
     */
     //  Upper right 50x50 is screen save button
-    if(p.x>touchx(270)  &&  p.y<touchy(50)  &&  SDCardAvailable && instrument!=TOUCH_CAL)
+    if(SDCardAvailable && instrument!=TOUCH_CAL && p.x>touchx(270)  &&  p.y<touchy(50))
       {
       drawScreenSaveBox(ILI9341_RED);
       bmpScreenSDCardRequest = true;
@@ -1172,6 +1196,7 @@ void loop()
 
      if(currentMenu == 16)   // Four Sig Gen setting menus
        {
+       changeSgSettings = false;
        /* Touch screen
         * Frequency Up   y = 27 to 52 pixel
         * Frequency Down y = 75 to 100 pixel
@@ -1180,54 +1205,56 @@ void loop()
         * All: x=(60, 100)  (100,140)  (140, 180)  (180,220)  (220, 260) pixels
         */
        boxNum = getBox7(p.x);
+       // NOTE - For sig gen 4 (noise) freq is not on screen, but still here.  This is harmless.  For FUTURE use.
        if (p.y >= touchy(27) && p.y < touchy(52))  // Increment freq
          {
          switch(boxNum)
            {
-           case 5: if(asg[currentSigGen].freq < 23999) asg[currentSigGen].freq += 1; break;
-           case 4: if(asg[currentSigGen].freq < 23989) asg[currentSigGen].freq += 10; break;
-           case 3: if(asg[currentSigGen].freq < 23899) asg[currentSigGen].freq += 100; break;
-           case 2: if(asg[currentSigGen].freq < 22999) asg[currentSigGen].freq += 1000; break;
-           case 1: if(asg[currentSigGen].freq < 12999) asg[currentSigGen].freq += 10000; break;
+           case 5: if(asg[currentSigGen].freq < 23999) asg[currentSigGen].freq += 1; changeSgSettings = true; break;
+           case 4: if(asg[currentSigGen].freq < 23989) asg[currentSigGen].freq += 10; changeSgSettings = true; break;
+           case 3: if(asg[currentSigGen].freq < 23899) asg[currentSigGen].freq += 100; changeSgSettings = true; break;
+           case 2: if(asg[currentSigGen].freq < 22999) asg[currentSigGen].freq += 1000; changeSgSettings = true; break;
+           case 1: if(asg[currentSigGen].freq < 12999) asg[currentSigGen].freq += 10000; changeSgSettings = true; break;
+           default: break;
            }
-         tToASGn();    // includes setSigGens()
          }
        else if (p.y >= touchy(75) && p.y < touchy(100))  // Decrement frequency
          {
          switch(boxNum)
            {
-           case 5: if(asg[currentSigGen].freq >= 1) asg[currentSigGen].freq -= 1; break;
-           case 4: if(asg[currentSigGen].freq >= 10) asg[currentSigGen].freq -= 10; break;
-           case 3: if(asg[currentSigGen].freq >= 100) asg[currentSigGen].freq -= 100; break;
-           case 2: if(asg[currentSigGen].freq >= 1000) asg[currentSigGen].freq -= 1000; break;
-           case 1: if(asg[currentSigGen].freq >= 10000) asg[currentSigGen].freq -= 10000; break;
+           case 5: if(asg[currentSigGen].freq >= 1) asg[currentSigGen].freq -= 1; changeSgSettings = true; break;
+           case 4: if(asg[currentSigGen].freq >= 10) asg[currentSigGen].freq -= 10; changeSgSettings = true; break;
+           case 3: if(asg[currentSigGen].freq >= 100) asg[currentSigGen].freq -= 100; changeSgSettings = true; break;
+           case 2: if(asg[currentSigGen].freq >= 1000) asg[currentSigGen].freq -= 1000; changeSgSettings = true; break;
+           case 1: if(asg[currentSigGen].freq >= 10000) asg[currentSigGen].freq -= 10000; changeSgSettings = true; break;
+           default: break;
            }
-         tToASGn();
          }
        else if (p.y >= touchy(117) && p.y < touchy(142))  // Increment amplitude
          {
          switch(boxNum)
            {
-           case 4: if(asg[currentSigGen].amplitude < 1.199f) asg[currentSigGen].amplitude += 0.001f; break;
-           case 3: if(asg[currentSigGen].amplitude < 1.189f) asg[currentSigGen].amplitude += 0.01f; break;
-           case 2: if(asg[currentSigGen].amplitude < 1.099f) asg[currentSigGen].amplitude += 0.1f; break;
-           case 1: if(asg[currentSigGen].amplitude < 0.199f) asg[currentSigGen].amplitude += 1.0f; break;
+           case 4: if(asg[currentSigGen].amplitude < 1.199f) asg[currentSigGen].amplitude += 0.001f; changeSgSettings = true; break;
+           case 3: if(asg[currentSigGen].amplitude < 1.189f) asg[currentSigGen].amplitude += 0.01f; changeSgSettings = true; break;
+           case 2: if(asg[currentSigGen].amplitude < 1.099f) asg[currentSigGen].amplitude += 0.1f; changeSgSettings = true; break;
+           case 1: if(asg[currentSigGen].amplitude < 0.199f) asg[currentSigGen].amplitude += 1.0f; changeSgSettings = true; break;
+           default: break;
            }
-         tToASGn();
          }
        else if (p.y >= touchy(165) && p.y < touchy(190))  // Decrement amplitude
          {
          switch(boxNum)
            {
-           case 4: if(asg[currentSigGen].amplitude >= 0.001f) asg[currentSigGen].amplitude -= 0.001f; break;
-           case 3: if(asg[currentSigGen].amplitude >= 0.01f)  asg[currentSigGen].amplitude -= 0.01f; break;
-           case 2: if(asg[currentSigGen].amplitude >= 0.1f)   asg[currentSigGen].amplitude -= 0.1f; break;
-           case 1: if(asg[currentSigGen].amplitude >= 1.0f)   asg[currentSigGen].amplitude -= 1.0f; break;
+           case 4: if(asg[currentSigGen].amplitude >= 0.001f) asg[currentSigGen].amplitude -= 0.001f; changeSgSettings = true; break;
+           case 3: if(asg[currentSigGen].amplitude >= 0.01f)  asg[currentSigGen].amplitude -= 0.01f; changeSgSettings = true; break;
+           case 2: if(asg[currentSigGen].amplitude >= 0.1f)   asg[currentSigGen].amplitude -= 0.1f; changeSgSettings = true; break;
+           case 1: if(asg[currentSigGen].amplitude >= 1.0f)   asg[currentSigGen].amplitude -= 1.0f; changeSgSettings = true; break;
+           default: break;
            }
-         tToASGn();    // includes setSigGens()
          }
+       if(changeSgSettings)
+         tToASGn();    // includes setSigGens()
        }  // End, if currentMenu==16 (SigGen N)
-
      else if(currentMenu == 17)   // VVM menus
        {
        /* Touch screen
@@ -1244,6 +1271,7 @@ void loop()
            case 3: if(phaseOffset <= 179.0f) phaseOffset += 1.0f; tToVVM(); break;
            case 2: if(phaseOffset <= 170.0f) phaseOffset += 10.0f; tToVVM(); break;
            case 1: if(phaseOffset <= 80.0f)  phaseOffset += 100.0f; tToVVM(); break;
+           default: break;
            }
          }
        else if (p.y >= touchy(165) && p.y < touchy(190))  // Decrement phaseOffset
@@ -1254,17 +1282,17 @@ void loop()
            case 3: if(phaseOffset >= -179.0f) phaseOffset -= 1.0f; tToVVM(); break;
            case 2: if(phaseOffset >= -179.0f) phaseOffset -= 10.0f; tToVVM(); break;
            case 1: if(phaseOffset >= -80.0f)  phaseOffset -= 100.0f; tToVVM(); break;
+           default: break;
            }
          }
        }  // End, if currentMenu==17 (VVM)
     wastouched = istouched;
-    delay(150);  // Reduces multiple touches on an intended one
     }    // End, screen was touched
 
  //if( rms1.available() )
  //   { Serial.println(rms1.read(), 4); delay(500); }
 
-  if(doRun == POWER_SWEEP)
+  if(instrument == AVNA && doRun == POWER_SWEEP)
      {
      dacSweep *= 1.04;
      dacLevel = dacSweep;
@@ -1277,7 +1305,7 @@ void loop()
      }
 
   // SERIAL CONTROL
-  if(doRun != RUNNOT && doRun != POWER_SWEEP)
+  if(instrument==AVNA && doRun != RUNNOT && doRun != POWER_SWEEP)
     {
     if(teststate == 1)
       ;
@@ -1363,7 +1391,6 @@ void loop()
      }
   }
 //  =================  END LOOP()  ======================
-
 
 // Returns the 1 of N touch boxes that is most likely for the x-value given by px.
 // N=6 for bottom menus and N=7 for up/down boxes.
@@ -1516,8 +1543,8 @@ void loadStateEEPROM(void)
      uSave.lastState.sgCal = 1.5792f;
      uSave.lastState.VVMCalConstant = 0.0000137798f;
      uSave.lastState.SAcalCorrectionDB = 4.5f;
-     uSave.lastState.int8version = CURRENT_VERSION;     // Mark as version 0.80
-     Serial.println("EEPROM data has been updated to that of version 0.80");
+     uSave.lastState.int8version = CURRENT_VERSION; 
+     Serial.println("EEPROM data has been updated to that of version 0.81");
      Serial.println("including default cal values for Vin and Vout.");
      flag = 1;
      }
