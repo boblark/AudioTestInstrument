@@ -24,7 +24,7 @@ All capabilities of Version 0.70 plus the following:
 ![Vector Voltmeter and Spectrum Analyzer Screens, AVNA Test Instrument](/images/AVNA_2Scr3.gif)
 
 ### Summary Install Procedure
-The details 
+The details vary between Windows, Apple and Linux, but here is the general outline:
 1. Install scurrent Arduino per https://www.arduino.cc/en/main/software
 2. Install Teensyduino per https://www.pjrc.com/teensy/td_download.html
 3. From github download AudioTestInstrument-master.zip
