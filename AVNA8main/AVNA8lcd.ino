@@ -445,7 +445,7 @@ void topLine2a(void)
  * Global control:  bmpScreenSDCardRequest   Write BMP file to SD card
  *                  hexScreenRequest         Send BMP file over USB serial
  */
-void dumpScreenToSD(void) {
+char* dumpScreenToSD(void) {
   uint8_t r, g, b;
   const uint16_t width = 320;
   const uint16_t height = 240;
@@ -454,7 +454,7 @@ void dumpScreenToSD(void) {
   const uint32_t filesize = 54 + 3 * width * height;
   // readPixel() combines RGB to 16-bit 565 format, readRect gets many of these
   uint16_t pixelColorArray[width];
-  char filename[] = "AVNA1_00.BMP";
+  static char filename[] = "AVNA_000.BMP";
   unsigned char bmpfileheader[14] = {'B','M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0};
 
   #define BMP_DEBUG 0
@@ -502,11 +502,12 @@ void dumpScreenToSD(void) {
   } ihFrame;
 
   // Format BMP File Name - determine if unique (so we can open)
-  // Open File
-  for (uint8_t i=0; i<100; i++)
+  // Open File up to 1000 of them, if needed
+  for (uint8_t i=0; i<1000; i++)
     {
-    filename[6] = i / 10 + '0';
-    filename[7] = i % 10 + '0';
+    filename[5] = i / 100 + '0';
+    filename[6] = i / 10  + '0';
+    filename[7] = i % 10  + '0';
     if (!SD.exists(filename))
       {
       // Only open a new file if it does not exist
@@ -657,6 +658,7 @@ void dumpScreenToSD(void) {
     bmpFile.close();
     bmpScreenSDCardRequest = false;
     }
+  return filename;
   }
 
 // Utility function for getting card info

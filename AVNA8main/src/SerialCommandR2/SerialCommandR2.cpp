@@ -37,6 +37,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <SoftwareSerial.h>
 #endif
 
+// #define SERIALCOMMANDDEBUG 1
+
 // Constructor makes sure some things are set.    Untested by RSL
 SerialCommand::SerialCommand()
     {

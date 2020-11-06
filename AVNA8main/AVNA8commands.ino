@@ -1,7 +1,7 @@
 // Serial Commands for AVNA  Made a module 24 Jan 2020  RSL
 /*  RSL_VNA8 Arduino sketch for audio VNA measurements.
  *  Copyright (c) 2016-2020 Robert Larkin  W7PUA
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -21,6 +21,310 @@
  * THE SOFTWARE.
  */
 // ---------------------  xxxxCommand()  Responses to serial commands  -------------
+
+// INSTRUMENT command
+// Defines the Instrument, these are mutually exclusive
+// ALL_IDLE -9, AVNA 0, VVM  1, ASA  2, VIN_CAL 3, VOUT_CAL 4, TOUCH_CAL 5
+void InstrumentCommand(void)
+  {
+  char *arg;
+
+  doRun = RUNNOT;  // Stop any measurements
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    if (atoi(arg) == ALL_IDLE)
+      {
+      instrument = ALL_IDLE;
+      doRun = RUNNOT;
+      nRun = 0;
+      tToInstrumentHome();
+      writeMenus(0);  
+
+      if (verboseData)  Serial.println("Set to All Idle");
+      }
+    else if (atoi(arg) == AVNA)
+      {
+      instrument = AVNA;
+      doRun = RUNNOT;
+      nRun = 0;
+      tToAVNAHome();
+      writeMenus(1);  
+      if (verboseData)  Serial.println("Set to AVNA");
+      }
+    else if (atoi(arg) == VVM)
+      {
+      instrument = VVM;
+      doRun = RUNNOT;
+      nRun = 0;
+      tToVVM();
+      writeMenus(17);  
+      if (verboseData)  Serial.println("Set to Vector Voltmeter");
+      }
+    else if (atoi(arg) == ASA)
+      {
+      instrument = ASA;
+      doRun = RUNNOT;
+      nRun = 0;
+      if (verboseData)  Serial.println("Set to Spectrum Analyzer");
+      tToASA();
+      prepSpectralDisplay();
+      writeMenus(12);  
+      }
+    else if (atoi(arg) == VIN_CAL)
+      {
+      instrument = VIN_CAL;
+      if (verboseData)  Serial.println("Set to VIn Calibrate");
+      writeMenus(20);  
+      tVInCal();
+      }
+    else if (atoi(arg) == VOUT_CAL)
+      {
+      instrument = VOUT_CAL;
+      if (verboseData)  Serial.println("Set to Vout Calibrate");
+      writeMenus(21);  
+      tVOutCal();
+      }
+    else if (atoi(arg) == TOUCH_CAL)
+      {
+      instrument = TOUCH_CAL;
+      if (verboseData)  Serial.println("Set to Touch Calibrate");
+      writeMenus(19);  
+      tTouchCal();
+      }
+    }
+  }
+
+/* SIGGEN i s f a w  Command
+  i=index 1,4;  s=On/Off 1,0;  f=freq Hz; a=ampliitude 0.0, 1.0;
+  For w, see https://www.pjrc.com/teensy/gui/?info=AudioSynthWaveform
+  WAVEFORM_SINE              0
+  WAVEFORM_SAWTOOTH          1
+  WAVEFORM_SQUARE            2
+  WAVEFORM_TRIANGLE          3
+  WAVEFORM_SAWTOOTH_REVERSE  6
+  This can be set anytime and is not associated with a particular instrument.
+  This command may not LCD display any change. The noise generator, SG #4, 
+  only reponds to on/off and amplitude (1-sigma value).  */
+void SigGenCommand(void)
+  {
+  char *arg;
+  uint16_t sgIndex;
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    int ii = atoi(arg);
+    if(ii>0 && ii<=4)
+      sgIndex = ii - 1;
+    else
+      return;
+    }
+  else
+    return;
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    asg[sgIndex].ASGoutputOn = (atoi(arg) != 0);  // bool
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL && sgIndex != 3)  // not for noise
+    {
+	float ff = (float)atof(arg);
+    asg[sgIndex].freq = ff;
+    if (ff < 0.0f  ||  ff > 0.5f*sampleRateExact)
+      asg[sgIndex].ASGoutputOn = false;
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+	float aa = (float)atof(arg);
+	if(aa < 0.0f)  aa = 0.0f;
+	if(aa > 1.0f)  aa = 1.0f;
+    asg[sgIndex].amplitude = aa;
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL && sgIndex != 3)
+    {
+    int w = atoi(arg);
+    if (w==0 || w==1 || w==2 || w==3 || w==4 || w==6)
+      asg[sgIndex].type = w;
+    else
+      asg[sgIndex].type = 0;
+    }
+  if (verboseData)
+     {
+     if(sgIndex==3)
+       Serial.print("Noise Generator, SG ");
+     else
+	   Serial.print("Sig Gen ");
+	 Serial.print(sgIndex);
+	 Serial.println(" successfully programmed.");
+     }
+  if(currentMenu == 15)  tToASGHome();  // Redraw
+  if(currentMenu == 16)  tToASGn();
+  checkSGoverload();
+  setSigGens();
+  }
+
+
+
+// Command the VVM on, measure continuous unless stopped by "RUN -2"
+//   Continuous: "RUN 0"
+//   n Measurements over Serial: "RUN n"
+//   Stop measure over Serial:  "RUN -2"
+void VVMCommand(void)
+  {
+  char *arg;
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    VVMSendSerial = (atoi(arg) != 0);  // bool
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    int u = atoi(arg);                  // 2 possibilities
+    if (u==1)  VVMFormat = VVM_VOLTS;
+    if (u==2)  VVMFormat = VVM_DBM;
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+	float p = (float)atof(arg);
+    if(p>180.0)        phaseOffset =  180.0;
+    else if(p<-180.0)  phaseOffset = -180.0;
+    else               phaseOffset = p;
+    }
+
+  if (verboseData)  Serial.println("VVM successfully programmed.");
+
+  if(instrument == VVM)
+    {
+    nRun=0;    // Continuous
+    doRun = CONTINUOUS;
+    tToVVM();  // Setup screen, etc
+    writeMenus(17);  
+    }
+  }
+
+/* Command the Spectrum Analyzer on
+ * ASACommand fmt sr m d of
+ *  fmt = Serial Format
+ *   sr = sample rate, 0 to 6
+ *    m = number of averages > 0
+ *    d = dB/div e.g., 10.0
+ *   of = offset in dB, e.g. 12.5
+ */
+void ASACommand(void)
+  {
+  char *arg;
+
+  instrument = ASA_IDLE;
+/*  arg = SCmd.next();      // Not Needed??
+  if (arg != NULL)
+    {
+    ASASendSerial = (atoi(arg) != 0);  // bool
+    }
+ */
+
+/*  1  = Comma dividers
+ *  2  = Space Dividers (can be after comma)
+ *  4  = Column of 512 (0 is row of 512)
+ *  8  = CR-LF not just LF (for columns)
+ * 16  = Leading/Trailing '|'
+ * 32  = dBm, not numerical power          */
+  arg = SCmd.next();
+  if (arg != NULL)
+    ASASerialFormat = (uint16_t)atoi(arg);
+
+  /* ASAI2SFreqIndex = 0  6 KHz Sample Rate
+   *                   1 12 kHz Sample Rate
+   *                   2 24 kHz Sample Rate
+   *                   3 48 kHz Sample Rate
+   *                   4 96 kHz Sample Rate  */
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    int sr = atoi(arg);
+    if (sr>=0 && sr<=6)
+      {
+      ASAI2SFreqIndex = sr;
+      setSample(freqASA[ASAI2SFreqIndex].rateIndex);
+      countMax = freqASA[ASAI2SFreqIndex].SAnAve;  // Anyone use this??? <<<<<<<<<<<<<<<<<<
+      }
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    int m = atoi(arg);
+    // NOTE - Set sample rate index above. Therefore next item
+    // applies ONLY to this one index
+    if(m>0 && m<1000)
+      {
+      freqASA[ASAI2SFreqIndex].SAnAve = m;
+      setSample(freqASA[ASAI2SFreqIndex].rateIndex);
+      countMax = freqASA[ASAI2SFreqIndex].SAnAve;
+      }
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    float d = atof(arg);
+    if(d>0.1f  &&  d<100.0f)
+      dbPerDiv = d;
+    }
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    {
+    float of = atof(arg);
+    if(of>=-200.0f  &&  of<=200.0f)
+      ASAdbOffset = of;
+    }
+
+  instrument = ASA;
+
+  if (verboseData)  Serial.println("ASA successfully programmed.");
+
+  nRun =  RUNNOT;    // Wait for RUNn trigger
+  doRun = CONTINUOUS;
+  prepSpectralDisplay();
+  tToASA();  // Setup screen, etc
+  writeMenus(12);
+  }
+
+void ScreenSaveCommand(void)
+  {
+  char *arg;
+  bool printFilename = false;
+
+  arg = SCmd.next();
+  if (arg != NULL)
+    printFilename = (atoi(arg) != 0);  // bool
+
+  if(SDCardAvailable)
+    {
+    bmpScreenSDCardRequest = true;  // Do anything useful? It is needed!
+    char* pf = dumpScreenToSD();
+    if(verboseData || printFilename)
+      {
+      Serial.print("Screen Save: ");
+      Serial.println(pf);
+      }
+    }
+  }
+
 // TRANSMISSION command
 void TransmissionCommand()
   {
@@ -136,7 +440,7 @@ void CalCommand0(uint16_t baseI)
       calZSingle = true;
       if(!doTuneup)                 // No bunches of "C" for Tuneup
         {
-        if(verboseData) 
+        if(verboseData)
            Serial.println("...Cal complete.");
         else
            Serial.println("C");
@@ -144,7 +448,7 @@ void CalCommand0(uint16_t baseI)
       }
     else if (uSave.lastState.SingleorSweep == SWEEP)  // Impedance Sweep
       {
-      setRefR(uSave.lastState.iRefR); 
+      setRefR(uSave.lastState.iRefR);
       setSwitch(CAL_39);
       DC1.amplitude(dacLevel);     // Turn on sine wave
       delay(50);
@@ -280,7 +584,7 @@ void CalSaveCommand()
   doingNano = false;
   arg = SCmd.next();
   if (arg != NULL)
-    doWhat = (uint16_t)atoi(arg); 
+    doWhat = (uint16_t)atoi(arg);
   else
     {
     Serial.println("No parameter was found for CALSAVE");
@@ -293,7 +597,7 @@ void CalSaveCommand()
     {
     nAve = (uint16_t)atoi(arg);
     Serial.print("Number of points averaged: ");
-    Serial.println(nAve); 
+    Serial.println(nAve);
     }
 
   if(doWhat == 0)
@@ -356,13 +660,15 @@ void CalSaveCommand()
       }
     }
   }
- 
+
 // RunCommand, in the command,  takes a parameter n that means to take n single measurements
 // or to do n sweeps.  An zero value for n is to never stop (except with "RUN n" with n>0).
-// A negative value is to not measure.
+// -1 is special single measure without cal. -2 or less is no run
 // The command is either "RUN n" or "R n".
-//      doRun:  RUNNOT, COUNTDOWN, CONTINUOUS, or SINGLE_NC (single serial meas, no cal)
+//      doRun:  RUNNOT, COUNTDOWN, CONTINUOUS, SINGLE_NC, POWER_SWEEP (single serial meas, no cal)
+//                0         2           1          3          4
 //      nRun: -1=stop measuring, 0 measure continuous, and 0<n is remaining measurements
+// rev .82 Use RUN command to control VVM and ASA. Same deal:  0=continuous, n>0 do n measurements
 void RunCommand(void)
   {
   char dr[16];
@@ -387,7 +693,7 @@ void RunCommand(void)
       doRun = SINGLE_NC;
       strcpy(dr, " (Single)");
       }
-    else
+    else  // -2 or less
       {
       doRun = RUNNOT;
       nRun = 0;
@@ -501,7 +807,7 @@ void DelayCommand()
 //  From CALDAT command.
 void CalDatCommand(void)
   {
-    
+
   }
 
 // From SERPAR command.  Sets type of output data for Z meas
@@ -544,7 +850,7 @@ void SerParCommand(void)
     }
   // Add possibility of S11 and S21 output?
   }
-  
+
 void TestCommand(void)
   {
   char *arg;
@@ -566,7 +872,7 @@ void TestCommand(void)
  // TEST 0 0  will leave all three switches off
  if(test_sw & 0X0001)
      digitalWrite(CAL_39, HIGH);          // On
- if(test_sw & 0X0002)    
+ if(test_sw & 0X0002)
     digitalWrite(IMPEDANCE_38, HIGH);     // On
  if(test_sw & 0X0004)
     digitalWrite(TRANSMISSION_37, HIGH);  // On
@@ -620,7 +926,7 @@ void Param1Command(void)
   }
 
 /* param2Command() - Serves the changing of correction factors for the impedance measurements.
- * arg in order:     capInput resInput capCouple seriesR seriesL  
+ * arg in order:     capInput resInput capCouple seriesR seriesL
  *             "PARAM2 37.0  1000000.0    0.22    0.07   20.0"
  * With units           pF      Ohm        uF      Ohm    nH
  *
@@ -630,7 +936,7 @@ void Param1Command(void)
 void Param2Command(void)
   {
   char *arg;
- 
+
   arg = SCmd.next();
   if (arg != NULL)
      uSave.lastState.capInput = 1.0E-12 * atof(arg);
@@ -710,12 +1016,12 @@ void TuneupCommand(void)
     e1MegSave=uSave.lastState.resInput;       eCinSave=uSave.lastState.capInput;
     }
   beenHere = true;
-  
+
   // Set values in case steps are omitted
   eRs =   uSave.lastState.seriesR;          eLs =  uSave.lastState.seriesL;
   eR50 =  uSave.lastState.valueRRef[R50];   eR5K = uSave.lastState.valueRRef[R5K];
   e1Meg = uSave.lastState.resInput;         eCin = uSave.lastState.capInput;
-  
+
   arg = SCmd.next();
   if (arg == NULL || atoi(arg) == 0)
     {
@@ -730,7 +1036,7 @@ void TuneupCommand(void)
     Serial.println("       Be sure to run TUNEUP 5 or TUNEUP 6 any of  1, 2, 3 or 4.");
     return;
     }
-    
+
   else if (atoi(arg) == 1)    // Calibrate Rs (500 Hz) and Ls (40 KHz)
     {
     doTuneup = true;
@@ -761,7 +1067,7 @@ void TuneupCommand(void)
     FreqData[nFreq].vRatio  = 0.01*meas3;
     FreqData[nFreq].dPhase = 0.01*meas4;
     Serial.print("500 Hz Measurement/Reference Voltage gain = ");
-    Serial.println(FreqData[nFreq].vRatio, 7); 
+    Serial.println(FreqData[nFreq].vRatio, 7);
     Serial.print("500 Hz Measurement - Reference Phase (deg) = ");
     Serial.println(FreqData[nFreq].dPhase, 3);
 
@@ -821,7 +1127,7 @@ void TuneupCommand(void)
     FreqData[nFreq].vRatio  = 0.01*meas3;
     FreqData[nFreq].dPhase = 0.01*meas4;
     Serial.print("40 KHz Measurement/Reference Voltage gain = ");
-    Serial.println(FreqData[nFreq].vRatio, 7); 
+    Serial.println(FreqData[nFreq].vRatio, 7);
     Serial.print("40 KHz Measurement - Reference Phase (deg) = ");
     Serial.println(FreqData[nFreq].dPhase, 3);
 
@@ -859,7 +1165,7 @@ void TuneupCommand(void)
       Serial.print("40 KHz  Ls = "); Serial.print(1000000000.0*eLs/251327.4, 1);
       }
     Serial.println(" nH   <----");
-    doTuneup = false; 
+    doTuneup = false;
     Serial.println("TUNEUP 1 Short Circuit tests COMPLETE");
     Serial.println("Ready for known 50 Ohm test, TUNEUP 2 R50");
     Serial.println();
@@ -899,7 +1205,7 @@ void TuneupCommand(void)
       FreqData[nFreq].vRatio  = 0.02*meas3;
       FreqData[nFreq].dPhase = 0.02*meas4;
       Serial.print("500 Hz Measurement/Reference Voltage gain = ");
-      Serial.println(FreqData[nFreq].vRatio, 7); 
+      Serial.println(FreqData[nFreq].vRatio, 7);
       Serial.print("500 Hz Measurement - Reference Phase (deg) = ");
       Serial.println(FreqData[nFreq].dPhase, 3);
 
@@ -972,7 +1278,7 @@ void TuneupCommand(void)
       FreqData[nFreq].vRatio  = 0.02*meas3;
       FreqData[nFreq].dPhase = 0.02*meas4;
       Serial.print("500 Hz Measurement/Reference Voltage gain = ");
-      Serial.println(FreqData[nFreq].vRatio, 7); 
+      Serial.println(FreqData[nFreq].vRatio, 7);
       Serial.print("500 Hz Measurement - Reference Phase (deg) = ");
       Serial.println(FreqData[nFreq].dPhase, 3);
 
@@ -1042,10 +1348,10 @@ void TuneupCommand(void)
     FreqData[nFreq].vRatio  = 0.02*meas3;
     FreqData[nFreq].dPhase = 0.02*meas4;
     Serial.print("500 Hz Measurement/Reference Voltage gain = ");
-    Serial.println(FreqData[nFreq].vRatio, 7); 
+    Serial.println(FreqData[nFreq].vRatio, 7);
     Serial.print("500 Hz Measurement - Reference Phase (deg) = ");
     Serial.println(FreqData[nFreq].dPhase, 3);
-    
+
     Serial.println("Measuring Open Circuit (1 Meg and Cin)...MEASURE 500 Hz...WAIT...");
     setRefR(R5K);           // Set 5000 Ohm relay
     uSave.lastState.ZorT = IMPEDANCE;
@@ -1091,10 +1397,10 @@ void TuneupCommand(void)
     FreqData[nFreq].vRatio  = 0.02*meas3;
     FreqData[nFreq].dPhase = 0.02*meas4;
     Serial.print("40 KHz Measurement/Reference Voltage gain = ");
-    Serial.println(FreqData[nFreq].vRatio, 7); 
+    Serial.println(FreqData[nFreq].vRatio, 7);
     Serial.print("40 KHz Measurement - Reference Phase (deg) = ");
     Serial.println(FreqData[nFreq].dPhase, 3);
-    
+
     Serial.println("Measuring Open Circuit (Cin)...MEASURE 40 KHz...WAIT...");
     setRefR(R5K);           // Set 5000 Ohm relay
     uSave.lastState.ZorT = IMPEDANCE;
@@ -1186,7 +1492,7 @@ void LinLogCommand(void)
      uSave.lastState.rsData = (uint8_t)atoi(arg);
   else
      {
-     sprintf(ch, "Currently:  LINLOG %d %d %d %d", 
+     sprintf(ch, "Currently:  LINLOG %d %d %d %d",
        (int)uSave.lastState.rsData,
        (int)uSave.lastState.tsData,
        (int)uSave.lastState.rdData,
@@ -1206,11 +1512,11 @@ void LinLogCommand(void)
   saveStateEEPROM();
   }
 
-// Command to change baud rate - 
+// Command to change baud rate -
 // In Teensy 3.6 this does nothing.  It is always 12 MBit/sec
 void BaudCommand(void)
   {
-  /*     Rev 0.5.9  */ 
+  /*     Rev 0.5.9  */
   }
 
 // "DUMP_E" command Serial prints the contents of the EEPROM, byte by byte.
@@ -1234,7 +1540,7 @@ void WriteECommand()
   char *arg;
   uint16_t i;      // EEPROM location
   uint8_t val;     // Byte to write
-  
+
   arg = SCmd.next();
   if (arg != NULL)
      i = (uint16_t)atoi(arg);
@@ -1243,7 +1549,7 @@ void WriteECommand()
      Serial.println("Error: Command WRITE_E needs two parameters");
      return;
      }
-     
+
   arg = SCmd.next();
   if (arg != NULL)
      val = (uint8_t)atoi(arg);
@@ -1280,11 +1586,11 @@ void calCommand()
     for (iii=1;  iii<=13; iii++)
         {
         Serial.print(FreqData[iii].vRatio,8);
-        Serial.print(",");        
+        Serial.print(",");
         Serial.print(FreqData[iii].dPhase,5);
-        Serial.print(",");               
+        Serial.print(",");
         Serial.print(FreqData[iii].thruRefAmpl,8);
-        Serial.print(",");                
+        Serial.print(",");
         Serial.println(FreqData[iii].thruRefPhase,5);
         }
      sendEOT();
@@ -1512,7 +1818,7 @@ void getDataPt(uint16_t mf)
   setUpNewFreq(0);   // Sets up sample frequency and waveform freq
   delay(ZDELAY);        // Delay until level is constant
   measureZ(0);      //  uses FreqData[0], result is Z[0]
-  
+
  // Crefl = (Z[0] - Complex(50.0, 0.0)) / (Z[0] + Complex(50.0, 0.0));
  // dataReReflec[mf] = Z[0].real();  //Crefl.real();
  // dataImReflec[mf] = Z[0].imag();  //Crefl.imag();
@@ -1529,7 +1835,7 @@ void getDataPt(uint16_t mf)
   setSwitch(TRANSMISSION_37);
   measureT();      // result is Tmeas
   dataReTrans[mf] = Tmeas.real();
-  dataImTrans[mf] = Tmeas.imag();  
+  dataImTrans[mf] = Tmeas.imag();
   }
 
 // For nanoVNA this starts sweep back up.  AVNA doesn't need that

@@ -58,10 +58,12 @@
           Updated EEPROM for these. Fixed double precision constants being read as floats.
    v0.8.1 Converted sig gen 4 to Gaussian noise gen.  Created 3 R2 local libraries.  Added S/N and SINAD to ASA.
           Added variable sample averaging for ASA.
+   v0.8.2 Added new serial commands, corrected WGNoise level, New Serial Commands: INSTRUMENT, SIGGEN, 
+          VECTORVM, SPECTRUM, SCREENSAVE.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
-#define CURRENT_VERSION 81
+#define CURRENT_VERSION 82
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -134,7 +136,7 @@ Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hard
 #include <Audio.h>
 #include <Wire.h>
 #include <SPI.h>
-//#include <SD.h>
+// #include <SD.h>
 #include <SD_t3.h>
 #include <SerialFlash.h>
 #include <EEPROM.h>
@@ -280,11 +282,11 @@ Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hard
 #define WAVEFORM_SAWTOOTH          1
 #define WAVEFORM_SQUARE            2
 #define WAVEFORM_TRIANGLE          3
-#define WAVEFORM_ARBITRARY         4
-#define WAVEFORM_PULSE             5
+//#define WAVEFORM_ARBITRARY         4
+//#define WAVEFORM_PULSE             5
 #define WAVEFORM_SAWTOOTH_REVERSE  6
-#define WAVEFORM_SAMPLE_HOLD       7
-#define WAVEFORM_TRIANGLE_VARIABLE 8
+//#define WAVEFORM_SAMPLE_HOLD       7
+//#define WAVEFORM_TRIANGLE_VARIABLE 8
 #define NOISE                      9
 
 // Signal generators can display volts or power into 50 Ohms
@@ -625,7 +627,7 @@ bool     calTSweep = false;
 bool     dataValidTSweep = false;
 bool     dataValidZSweep = false;
 uint16_t doRun = RUNNOT;  //  Set of measurements or sweeps, also CONTINUOUS or COUNTDOWN
-uint16_t nRun = 0;        // count down until 0
+int16_t nRun = 0;        // count down until 0
 // Control of the AVNA comes from either the USB communications, or from the touch screen,
 // at start up. The touch screen can be turned off by command.  The USB command is always running..
 // Output is to either USB or to the screen display, as controlled by useUSB and useLCD.
@@ -728,6 +730,7 @@ float32_t phaseOffset = 0.0f;
 #define VVM_DBM 2
 // Data can be either high input-Z volts or 50-Ohm dBm
 int16_t VVMFormat = VVM_VOLTS;
+bool VVMSendSerial = false;
 
 // Save the freq[0] from the AVNA when using VVM
 float32_t saveFreq0;
@@ -759,8 +762,9 @@ float32_t specMax, specMaxFreq;
 //  float32_t khzPerDiv = 4.0f;
 //  float32_t khzOffset = 0.0f;
 uint16_t ASAI2SFreqIndex = 4;  // 96 kHz sample rate
-uint16_t countMax = 100;  //  Make user adjustable
+uint16_t countMax = 100;  //  User adjustable
 uint16_t countAve = 0;     // Set to zero to start new average
+bool SASendSerial = false;
 struct frequencyData {
     float32_t sampleRate;
     uint16_t rateIndex;
@@ -781,7 +785,17 @@ float pwr10, pwr10DB;
 float sinadNoisePower, sinadSignalPower, signalOnlyPower;
 float sinadNoisePowerDB, sinadSignalPowerDB, signalOnlyPowerDB;
 bool sinadOn = false;
-uint16_t sinadLastRate = S96K;
+uint16_t sinadLastIndex = 4;    // ASAI2SFreqIndex for return from SINAD
+bool ASASendSerial = false;
+
+/*  1  = Comma dividers
+ *  2  = Space Dividers (can be after comma)
+ *  4  = Column of 512 (0 is row of 512)
+ *  8  = CR-LF not just LF (for columns)
+ * 16  = Leading/Trailing '|'
+ * 32  = dB, not power          */
+uint16_t ASASerialFormat = 18;
+
 // ----------- End Spectrum analyzer variables -------
 
 // Variables to support BMP Screen Saves to SD Card
@@ -955,11 +969,11 @@ void setup()
   DC1.amplitude(dacLevel);                          // Gain control for DAC output
   //factorFreq is global that corrects any call involving absolute frequency, like waveform generation.
   factorFreq = FBASE / sampleRateExact;    // 44117.65f /
-  // Setup callbacks for SerialCommand commands
 
   // Configure the ASA window algorithm to use
   fft1024p.windowFunction(AudioWindowHanning1024);
 
+  // Setup callbacks for SerialCommand commands
   SCmd.addCommand("ZMEAS", ZmeasCommand);
   SCmd.addCommand("Z", ZmeasCommand);
   SCmd.addCommand("TRANSMISSION", TransmissionCommand);
@@ -999,12 +1013,20 @@ void setup()
   SCmd.addCommand("data", dataCommand);
   SCmd.addCommand("sweep", sweepCommand);
   SCmd.addCommand("resume", resumeCommand);
+  // Commands added for new instruments, ver 0.82 Oct 2020
+  SCmd.addCommand("INSTRUMENT", InstrumentCommand);
+  SCmd.addCommand("SIGGEN", SigGenCommand);
+  SCmd.addCommand("VECTORVM", VVMCommand);
+  SCmd.addCommand("SPECTRUM", ASACommand);
+  SCmd.addCommand("SCREENSAVE", ScreenSaveCommand);
   SCmd.addDefaultHandler(unrecognized);         // Handler for command that isn't matched
   // Response variations:  ECHO_FULL_COMMAND replies with full received line, even if command is not valid.
   // ECHO_COMMAND ((first token only) and ECHO_OK only respond if command is valid.  With EOL.
   // ECHO_ONE responds with numerical 1 if command is valid and numerical 0 if invalid.  No EOL.
   // NO_RESPONSE  does that.
   SCmd.setResponse(ECHO_FULL_COMMAND);
+
+
   VNAMode = 1;
   uSave.lastState.msDelay = 700;   // Needs adjustable param
   Serial.println("");
@@ -1086,7 +1108,6 @@ void loop()
     {
     inChar = Serial.read();   // Read an available character, there may be more waiting
     serInBuffer.unshift(inChar);
-    // SCmd.processCh(inChar);
     }
   if(commandOpen)
     {
@@ -1544,7 +1565,7 @@ void loadStateEEPROM(void)
      uSave.lastState.VVMCalConstant = 0.0000137798f;
      uSave.lastState.SAcalCorrectionDB = 4.5f;
      uSave.lastState.int8version = CURRENT_VERSION; 
-     Serial.println("EEPROM data has been updated to that of version 0.81");
+     Serial.println("EEPROM data has been updated to that of version 0.82");
      Serial.println("including default cal values for Vin and Vout.");
      flag = 1;
      }
@@ -1828,6 +1849,7 @@ float32_t modifyFreq(float32_t f)
 
 void setSample(uint16_t nS)
   {
+  // nS is one of the 8 or so possible rates, named S6K, ... ,S192K
   sampleRateExact = (float32_t)setI2SFreq(nS);  // It returns a double
   //factorFreq is global that corrects any call involving absolute frequency, like waveform generation.
   factorFreq = FBASE / sampleRateExact;

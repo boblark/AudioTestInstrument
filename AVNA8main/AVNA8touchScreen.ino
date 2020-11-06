@@ -408,10 +408,16 @@ void tToASGHome(void)
         }
       tft.setTextColor(ILI9341_YELLOW);
       tft.setCursor(255, 82 + 22*jj);
-      if (asg[jj].type == WAVEFORM_SINE)
-        tft.print("Sine");
-      else if (asg[jj].type == WAVEFORM_SQUARE)
-        tft.print("Square");
+
+      switch (asg[jj].type)
+        {
+        case WAVEFORM_SINE: tft.print("Sine"); break;
+        case WAVEFORM_SQUARE: tft.print("Square"); break;
+        case WAVEFORM_SAWTOOTH: tft.print("Sawtooth"); break;
+        case WAVEFORM_TRIANGLE: tft.print("Triangle"); break;
+        case WAVEFORM_SAWTOOTH_REVERSE: tft.print("Saw Rev"); break;
+        //case NOISE:  tft.print("GWN"); break;
+        }
     }
 
     tft.setCursor(10, 82 + 66);
@@ -485,6 +491,7 @@ void tToASGn(void)
   else
     drawScreenSaveBox(ILI9341_BLACK);
 
+  tft.setFont(Arial_12);
   tft.setCursor(8, 57);
   if(currentSigGen==3)
     ;  //  tft.print("LPF");  TEMP til filter is fixed
@@ -545,12 +552,16 @@ void tToASGn(void)
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
   tft.setCursor(240, 181);
-  if (asg[currentSigGen].type == WAVEFORM_SINE)
-    tft.print("Sine");
-  else if (asg[currentSigGen].type == WAVEFORM_SQUARE)
-    tft.print("Square");
-  else if (asg[currentSigGen].type == NOISE)
-    tft.print("GWN");
+
+  switch (asg[currentSigGen].type)
+    {
+    case WAVEFORM_SINE: tft.print("Sine"); break;
+    case WAVEFORM_SQUARE: tft.print("Square"); break;
+    case WAVEFORM_SAWTOOTH: tft.print("Sawtooth"); break;
+    case WAVEFORM_TRIANGLE: tft.print("Triangle"); break;
+    case WAVEFORM_SAWTOOTH_REVERSE: tft.print("Saw Rev"); break;
+    case NOISE:  tft.print("GWN"); break;
+    }
 
  if(currentSigGen==3) tft.fillRect(0, 25, tft.width(), 75, ILI9341_BLACK); // TEMP for no LPF
   checkSGoverload();
@@ -578,8 +589,6 @@ void checkSGoverload(void)
       tft.print("OVERLOAD");
       }
     }
-
-
   }
 
 // Set frequency, on/off and amplitude of 3 sig gens plus 1 noise gen
@@ -601,7 +610,8 @@ void setSigGens(void)
     else
       mixer1.gain(ii, 0.0f);
     }
-  noise1.amplitude(asg[3].amplitude);
+  // 2.06 seems close, but needs analysis!!
+  noise1.amplitude(2.06f*uSave.lastState.sgCal*asg[3].amplitude);
   noise1.setLowPass(factorFreq*asg[3].freq);
   }
 
@@ -778,6 +788,23 @@ void VVMMeasure(void)
   tft.setFont(Arial_9);
   tft.setCursor(270, 28);
   tft.print(countMeasurements);
+
+  // The nRun and doRun for VVM only refer to sending data over serial
+  // The on-screen VVM continues
+  if(nRun>=0 && doRun!=RUNNOT)
+    {
+    if (VVMFormat == VVM_VOLTS)
+      Serial.print(MT, 8);
+    else if (VVMFormat == VVM_DBM)
+      Serial.print(MTdB, 3);
+    Serial.print(" ");
+    Serial.println(PT, 2);
+    if(nRun>0 && --nRun==0)
+      {
+      nRun = -1;
+      doRun = RUNNOT;;  // Don't go continuous
+      }
+    }
   }
 
 void tToASA(void)
@@ -802,10 +829,10 @@ void tToASA(void)
   setSwitch(TRANSMISSION_37);
   DC1.amplitude(0.0);   // (dacLevel);
   tft.fillScreen(ILI9341_BLACK);
-  if(SDCardAvailable)
-    drawScreenSaveBox(ILI9341_GREEN);
-  else
-    drawScreenSaveBox(ILI9341_BLACK);
+//  if(SDCardAvailable)
+//    drawScreenSaveBox(ILI9341_GREEN);
+//  else
+//    drawScreenSaveBox(ILI9341_BLACK);
   setSample(freqASA[ASAI2SFreqIndex].rateIndex);
   countMax = freqASA[ASAI2SFreqIndex].SAnAve;
   prepSpectralDisplay();
@@ -825,7 +852,7 @@ void tToASAFreq(void)
         freqASA[ASAI2SFreqIndex].SAnAve *= 2;
   if( (currentMenu == 13 ) && (menuItem == 4) && (freqASA[ASAI2SFreqIndex].SAnAve >= 4) )
         freqASA[ASAI2SFreqIndex].SAnAve /= 2;
-  
+
   setSample(freqASA[ASAI2SFreqIndex].rateIndex);
   countMax = freqASA[ASAI2SFreqIndex].SAnAve;
   tft.fillRect(0, 38, tft.width(), 200, ILI9341_BLACK);
@@ -850,7 +877,8 @@ void tToASAFreq(void)
   tft.setCursor(20, 164);
     tft.print("Samples per Update");
   tft.setCursor(220, 164);
-  tft.print(freqASA[ASAI2SFreqIndex].SAnAve); 
+  tft.print(freqASA[ASAI2SFreqIndex].SAnAve);
+  instrument = ASA;
   }
 
 void tToASAAmplitude(void)
@@ -893,23 +921,21 @@ void tToASAAmplitude(void)
   }
 
 void tToASASinad(void) {
-  if(sinadOn) {     // So, we turning Sinad off
+  if(sinadOn) {     // So, we are turning Sinad off
     sinadOn = false;
-    ASAI2SFreqIndex = sinadLastRate; // restore
-    setSample(ASAI2SFreqIndex);
+    ASAI2SFreqIndex = sinadLastIndex; // restore
+    setSample( freqASA[ASAI2SFreqIndex].rateIndex );
     prepSpectralDisplay();
     show_spectrum();
     }
   else {
     sinadOn = true;
-    sinadLastRate = ASAI2SFreqIndex;  // Save for restore
+    sinadLastIndex = ASAI2SFreqIndex;  // Save for restore
     ASAI2SFreqIndex = S12K;
-    setSample(ASAI2SFreqIndex);
+    setSample( freqASA[ASAI2SFreqIndex].rateIndex );
     prepSpectralDisplay();
     show_spectrum();
     }
-
-uint16_t sinadLastRate = S96K;
 }
 
 // This may be extreme, but does the job.  Clears reference to data

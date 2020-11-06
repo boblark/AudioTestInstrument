@@ -42,7 +42,6 @@ void doFFT(void)
       avePower[ii] += fft1024p.read(ii);   // Power average, 0.0 for sine wave full scale down to -80 or so
       }
 
-//    if(++countAve == countMax)  // Averaging is compete, get info and plot
       if(++countAve >= freqASA[ASAI2SFreqIndex].SAnAve)
       {
       specMax = 0.0f; iiMax = 0;
@@ -136,10 +135,51 @@ void doFFT(void)
         if (pixelnew[ii] < 0)
            pixelnew[ii] = 0;
         }   // End, over all 256 pixels
-      for(int ii=0; ii<512; ii++)    // Clear powers for next measurement
-        avePower[ii] = 0.0f;
+
       show_spectrum();
       countAve = 0;
+
+      /* The nRun and doRun for ASA only refer to sending data over serial
+       * The on-screen stuff continues.  ASASerialFormat has the following:
+       *  1  = Comma dividers
+       *  2  = Space Dividers (can be after comma)
+       *  4  = Column of 512 (0 is row of 512)
+       *  8  = CR-LF not just LF (for columns)
+       * 16  = Leading/Trailing '|'
+       * 32  = dB, not power          */
+      if(nRun>=0 && doRun!=RUNNOT)
+        {
+        if(ASASerialFormat & 16)
+          Serial.print("|");
+        for (int ii=0; ii<512; ii++)
+          {
+          if(ASASerialFormat & 32)
+            if (avePower[ii] <= 0.0f)
+              Serial.print("-150.000");
+            else
+              Serial.print(10.0f*log10f(avePower[ii]), 3);
+          else
+            Serial.print(avePower[ii],8);
+          if((ASASerialFormat & 1) && ii<511)
+            Serial.print(",");
+          if(ASASerialFormat & 2)
+            Serial.print(" ");
+          if(ASASerialFormat & 8)
+            Serial.print("\r");
+          if(ASASerialFormat & 4)
+            Serial.print("\n");
+          }
+        if(ASASerialFormat & 16)
+          Serial.println("|");
+
+        if(nRun>0 && --nRun==0)
+          {
+          nRun = -1;
+          doRun = RUNNOT;;  // Don't go continuous
+          }
+        }
+      for(int ii=0; ii<512; ii++)    // Clear powers for next measurement
+        avePower[ii] = 0.0f;
       }  // End, if averging is finished
     }  // End, if fft available
   }
@@ -174,8 +214,13 @@ void prepSpectralDisplay(void)
        tft.print((0.2*freqASA[ASAI2SFreqIndex].maxFreq)*(float)ii, 1);
        }
      }
-   tft.setCursor(275, 183);
-     tft.print("kHz");
+  tft.setCursor(275, 183);
+  tft.print("kHz");
+     
+  if(SDCardAvailable)
+    drawScreenSaveBox(ILI9341_GREEN);
+  else
+    drawScreenSaveBox(ILI9341_BLACK);
   }
 
 // Spectrum display based on DD4WH Convolution Radio
