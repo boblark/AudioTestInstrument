@@ -40,7 +40,7 @@ void InstrumentCommand(void)
       doRun = RUNNOT;
       nRun = 0;
       tToInstrumentHome();
-      writeMenus(0);  
+      writeMenus(0);
 
       if (verboseData)  Serial.println("Set to All Idle");
       }
@@ -50,7 +50,7 @@ void InstrumentCommand(void)
       doRun = RUNNOT;
       nRun = 0;
       tToAVNAHome();
-      writeMenus(1);  
+      writeMenus(1);
       if (verboseData)  Serial.println("Set to AVNA");
       }
     else if (atoi(arg) == VVM)
@@ -59,7 +59,7 @@ void InstrumentCommand(void)
       doRun = RUNNOT;
       nRun = 0;
       tToVVM();
-      writeMenus(17);  
+      writeMenus(17);
       if (verboseData)  Serial.println("Set to Vector Voltmeter");
       }
     else if (atoi(arg) == ASA)
@@ -70,27 +70,27 @@ void InstrumentCommand(void)
       if (verboseData)  Serial.println("Set to Spectrum Analyzer");
       tToASA();
       prepSpectralDisplay();
-      writeMenus(12);  
+      writeMenus(12);
       }
     else if (atoi(arg) == VIN_CAL)
       {
       instrument = VIN_CAL;
       if (verboseData)  Serial.println("Set to VIn Calibrate");
-      writeMenus(20);  
+      writeMenus(20);
       tVInCal();
       }
     else if (atoi(arg) == VOUT_CAL)
       {
       instrument = VOUT_CAL;
       if (verboseData)  Serial.println("Set to Vout Calibrate");
-      writeMenus(21);  
+      writeMenus(21);
       tVOutCal();
       }
     else if (atoi(arg) == TOUCH_CAL)
       {
       instrument = TOUCH_CAL;
       if (verboseData)  Serial.println("Set to Touch Calibrate");
-      writeMenus(19);  
+      writeMenus(19);
       tTouchCal();
       }
     }
@@ -105,7 +105,7 @@ void InstrumentCommand(void)
   WAVEFORM_TRIANGLE          3
   WAVEFORM_SAWTOOTH_REVERSE  6
   This can be set anytime and is not associated with a particular instrument.
-  This command may not LCD display any change. The noise generator, SG #4, 
+  This command may not LCD display any change. The noise generator, SG #4,
   only reponds to on/off and amplitude (1-sigma value).  */
 void SigGenCommand(void)
   {
@@ -133,7 +133,7 @@ void SigGenCommand(void)
   arg = SCmd.next();
   if (arg != NULL && sgIndex != 3)  // not for noise
     {
-	float ff = (float)atof(arg);
+    float ff = (float)atof(arg);
     asg[sgIndex].freq = ff;
     if (ff < 0.0f  ||  ff > 0.5f*sampleRateExact)
       asg[sgIndex].ASGoutputOn = false;
@@ -142,9 +142,9 @@ void SigGenCommand(void)
   arg = SCmd.next();
   if (arg != NULL)
     {
-	float aa = (float)atof(arg);
-	if(aa < 0.0f)  aa = 0.0f;
-	if(aa > 1.0f)  aa = 1.0f;
+    float aa = (float)atof(arg);
+    if(aa < 0.0f)  aa = 0.0f;
+    if(aa > 1.0f)  aa = 1.0f;
     asg[sgIndex].amplitude = aa;
     }
 
@@ -162,9 +162,9 @@ void SigGenCommand(void)
      if(sgIndex==3)
        Serial.print("Noise Generator, SG ");
      else
-	   Serial.print("Sig Gen ");
-	 Serial.print(sgIndex);
-	 Serial.println(" successfully programmed.");
+       Serial.print("Sig Gen ");
+     Serial.print(sgIndex);
+     Serial.println(" successfully programmed.");
      }
   if(currentMenu == 15)  tToASGHome();  // Redraw
   if(currentMenu == 16)  tToASGn();
@@ -197,7 +197,7 @@ void VVMCommand(void)
   arg = SCmd.next();
   if (arg != NULL)
     {
-	float p = (float)atof(arg);
+    float p = (float)atof(arg);
     if(p>180.0)        phaseOffset =  180.0;
     else if(p<-180.0)  phaseOffset = -180.0;
     else               phaseOffset = p;
@@ -210,7 +210,7 @@ void VVMCommand(void)
     nRun=0;    // Continuous
     doRun = CONTINUOUS;
     tToVVM();  // Setup screen, etc
-    writeMenus(17);  
+    writeMenus(17);
     }
   }
 
@@ -314,23 +314,18 @@ void ScreenSaveCommand(void)
     int d = atof(arg);
     if(d==1)
        hexScreenRequest = true;
-    else if (d == 2)
-        ;
-    }
-
-  arg = SCmd.next();
-  if (arg != NULL)
-    printFilename = (atoi(arg) != 0);  // bool
-
-  if(SDCardAvailable)
-    {
-    bmpScreenSDCardRequest = true;  // Do anything useful? It is needed!
-    char* pf = dumpScreenToSD();
-    if(verboseData || printFilename)
-      {
-      Serial.print("Screen Save: ");
-      Serial.println(pf);
-      }
+    else if ((d == 2) && SDCardAvailable)
+       {
+       bmpScreenSDCardRequest = true;  // Do anything useful? It is needed!
+       char* pf = dumpScreenToSD();
+       if(verboseData || printFilename)
+         {
+         Serial.print("Screen Save: ");
+         Serial.println(pf);
+         }
+       }
+     if((d == 2) && !SDCardAvailable)
+        Serial.println("Error: No uSD card available for BMP file");
     }
   }
 
