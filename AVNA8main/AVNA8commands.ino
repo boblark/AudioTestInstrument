@@ -172,8 +172,6 @@ void SigGenCommand(void)
   setSigGens();
   }
 
-
-
 // Command the VVM on, measure continuous unless stopped by "RUN -2"
 //   Continuous: "RUN 0"
 //   n Measurements over Serial: "RUN n"
@@ -308,6 +306,17 @@ void ScreenSaveCommand(void)
   {
   char *arg;
   bool printFilename = false;
+
+  arg = SCmd.next();  // 1 for screen save to Serial hex file;
+                      // 2 for screen save to uSD card
+  if (arg != NULL)
+    {
+    int d = atof(arg);
+    if(d==1)
+       hexScreenRequest = true;
+    else if (d == 2)
+        ;
+    }
 
   arg = SCmd.next();
   if (arg != NULL)

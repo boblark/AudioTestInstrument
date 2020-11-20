@@ -315,11 +315,20 @@ boolean getFullDataPt(void)
   // The four data items will not become available in any particular order.
   // So track their status with NNReady[]
   // serial transmit data
+   
   if (NNReady[0] && NNReady[1] && NNReady[2] && NNReady[3])    // Everybody ready
     {
     // Find ave power, correct for noise, and convert to an amplitude
     // The voltage at the top of the measurement resistor is measured
     // as ref Q, superAveNN[2], and ref I, superAveNN[3]. The superAveNN[] are doubles.
+    
+//    if(current nFreq= something)
+//      {
+//      superAveNN[0] -= correctIsolationI[  freq  ];
+//      superAveNN[1] -= correctIsolationQ[  freq  ];
+//      }
+// That will do fine if the DUT is "matched".  Real Isolation with better 3125's is the answer, though.
+
     amplitudeV = sqrtf( (float32_t) (superAveNN[1] * superAveNN[1] + superAveNN[0] * superAveNN[0]) );
     amplitudeR = sqrtf( (float32_t) (superAveNN[3] * superAveNN[3] + superAveNN[2] * superAveNN[2]) );
     // Minus signs reflect the hookup of the inputs to U1A and U1D:

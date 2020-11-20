@@ -28,6 +28,8 @@ void tToInstrumentHome(void)
   tft.fillRect(0, 0, 320, 200, ILI9341_BLACK);
   topLine1();  topLine2();
   instrument = ALL_IDLE;
+  mixer2.gain(0, 0.0);       // Turn off signal generatrs
+  mixer2.gain(1, 0.0);       // Turn off AVNA source signal 
   avnaState = 0;
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
@@ -164,6 +166,8 @@ void tVInCal(void)
   bool missingData = false;
   setI2SFreq(S96K);   // 96 KHz sample rate
   instrument = VIN_CAL;
+  mixer2.gain(0, 0.0);       // Turn off signal generatrs
+  mixer2.gain(1, 0.0);       // Turn off AVNA source signal 
   if(currentMenu==20 && menuItem==1)    // Measure is requested
     {
     tft.fillRect(0, 187, 320, 12, ILI9341_BLACK);
@@ -267,7 +271,6 @@ void tVOutCal(void)
 
   setI2SFreq(S96K);   // 96 KHz sample rate
   instrument = VOUT_CAL;
-
   setRefR(R50);          // 50 Ohm output
   setSwitch(TRANSMISSION_37);        // Connect for T measure
 
@@ -275,6 +278,8 @@ void tVOutCal(void)
   FreqData[0].freqHz = 1030.0f;
   setUpNewFreq(0);
   // The left ('Z') port comes from the fsig gen asg[0].
+  mixer2.gain(0, 1.0);       // Turn on signal generatrs
+  mixer2.gain(1, 0.0);       // Turn off AVNA source signal 
   asg[0].type = WAVEFORM_SINE;
   asg[0].freq = 1030.0f;
   asg[0].amplitude = 0.14142136f;  //  0.05V RMS, a known value, well below overload
@@ -596,7 +601,7 @@ void setSigGens(void)
   {
   // Initialize the three signal generators synth_waveform
   // via "begin(float t_amp, float t_freq, short t_type)"
-  mixer2.gain(0, 1.0);   // Turn on signal generatrs
+  mixer2.gain(0, 1.0);   // Turn on signal generators
   mixer2.gain(1, 0.0);   // Turn off AVNA source signal
   setRefR(R50);          // 50 Ohm output
   setSwitch(TRANSMISSION_37);        // Connect for T measure
@@ -668,8 +673,7 @@ void tToVVM(void)
   // VVM, even if it is turned off.  For steady phase, Sig Gen 1 should be
   // used.  To measure voltage, or dBm, the frequency needs to be "close".
   setSigGens();
-  //mixer2.gain(0, 1.0f);   // Turn on signal generators
-  //mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
+
   instrument = VVM;
   mixer2.gain(0, 1.0f);   // Turn on 4x signal generatrs
   mixer2.gain(1, 0.0f);   // Turn off AVNA source signal
@@ -878,22 +882,23 @@ void tToASAFreq(void)
     tft.print("Samples per Update");
   tft.setCursor(220, 164);
   tft.print(freqASA[ASAI2SFreqIndex].SAnAve);
-  instrument = ASA;
   }
 
 void tToASAAmplitude(void)
   {
   instrument = ASA_IDLE;
-  // Allow dB/div as 5, 10, 20.
+  // Allow dB/div as 2, 5, 10, 20.
   if((currentMenu == 14 ) && (menuItem == 1) && (dbPerDiv<20.0f))  // dB/div up
     {
-    if(dbPerDiv < 9.0f)  dbPerDiv = 10.0f;
-    else  dbPerDiv = 20.0f;
+    if(dbPerDiv < 2.1f)       dbPerDiv = 5.0f;
+    else if(dbPerDiv < 5.1f)  dbPerDiv = 10.0f;
+    else                      dbPerDiv = 20.0f;
     }
-  if((currentMenu == 14 ) && (menuItem == 2) && (dbPerDiv > 5.0f))
+  if((currentMenu == 14 ) && (menuItem == 2) && (dbPerDiv > 2.0f))
     {
-    if(dbPerDiv > 11.0f) dbPerDiv = 10.0f;
-    else dbPerDiv = 5.0f;
+    if(dbPerDiv > 10.1f)      dbPerDiv = 10.0f;
+    else if(dbPerDiv> 5.1f)   dbPerDiv = 5.0f;
+    else                      dbPerDiv = 2.0f;
     }
   // Allow dBOffset in 5 dB steps
   if((currentMenu == 14 ) && (menuItem == 3))  // dBOffset up
@@ -1039,7 +1044,7 @@ void tDoSweepZ(void)                        // Impedance Sweep
 
 // This is for touch-LCD controlled sweep. It is a single sweep, commanded
 // by "Single Sweep" on touch LCD. The display is separate, as it needs to change
-/// withthe displayed frequencies.
+// with the displayed frequencies.
 void tDoSweepT(void)
   {
   topLines();
@@ -1173,7 +1178,7 @@ void doWhatPart(void)
     RR = Z[nBest].real();
     XX = Z[nBest].imag();
     tft.setFont(Arial_18);
-    tft.setCursor(20, 67);
+    tft.setCursor(20, 64);
     if(XX<=0.0 && (Q[nBest]>1.0 || Q[nBest]<0.0))          // Call it a capacitor
        {
        tft.print("C=");
@@ -1210,8 +1215,23 @@ void doWhatPart(void)
           tft.print(valueString(sLC[nBest], cUnits));
           }
         }
-     printQuality(ZMBest / 50.0);
-
+    printQuality(ZMBest / 50.0);
+    tft.setFont(Arial_9);
+    tft.setCursor(20, 90);
+    tft.print("Series Impedance R + jX = ");
+    tft.print(valueStringSign(RR, rUnits));
+      if(XX>=0.0f)
+        {
+        tft.print(" +j");
+        tft.print(valueStringSign(XX, rUnits));
+	    }
+      else
+        {
+        tft.print(" -j");
+        tft.print(valueStringSign(-XX, rUnits));
+	    }      
+       
+       
   // This is mostly duplicate stuff of 50 Ohm---make separate function <<<<<<<<<<<
   tft.setFont(Arial_12);
   tft.setCursor(10, 140);
@@ -1235,7 +1255,7 @@ void doWhatPart(void)
         ZMBest = ZM;
         }
      }
-    tft.fillRect(0, 100, tft.width(), 84, ILI9341_BLACK);
+    tft.fillRect(0, 120, tft.width(), 64, ILI9341_BLACK);
     tft.setCursor(10, 120);
     tft.setFont(Arial_14);
     tft.print("Ref=5K Ohm, At Freq = ");
@@ -1251,7 +1271,7 @@ void doWhatPart(void)
     XX = Z[nBest].imag();
 
     tft.setFont(Arial_18);
-    tft.setCursor(20, 147);
+    tft.setCursor(20, 144);
 
     if(XX<=0.0 && (Q[nBest]>1.0 || Q[nBest]<0.0))          // Call it a capacitor
        {
@@ -1290,6 +1310,22 @@ void doWhatPart(void)
           }
         }
   printQuality(ZMBest / 5000.0);
+
+    tft.setFont(Arial_9);
+    tft.setCursor(20, 170);
+    tft.print("Series Impedance R + jX = ");
+    tft.print(valueStringSign(RR, rUnits));
+      if(XX>=0.0f)
+        {
+        tft.print(" +j");
+        tft.print(valueStringSign(XX, rUnits));
+	    }
+      else
+        {
+        tft.print(" -j");
+        tft.print(valueStringSign(-XX, rUnits));
+	    }      
+       
 
   // Leave this function with the sate restored
   uSave.lastState.SingleorSweep = saveSS;

@@ -413,7 +413,7 @@ void topLine2(void)
   tft.fillRect(0, 22, tft.width(), 16, ILI9341_BLACK);
   tft.setTextColor(ILI9341_WHITE);
   tft.setCursor(5, 22);
-  tft.print("Ver 0.81 de W7PUA");
+  tft.print("Ver 0.83 de W7PUA");
   tft.setTextColor(ILI9341_YELLOW);
   }
 
@@ -531,6 +531,10 @@ char* dumpScreenToSD(void) {
     Serial.println(filename);
     }
 
+  if(hexScreenRequest)
+    hexout(0, 1);  //Start hex file of BMP to monitor
+
+
   //Format file header and write
   bmpfileheader[2] = (unsigned char)filesize;
   bmpfileheader[3] = (unsigned char)(filesize>>8);
@@ -538,15 +542,11 @@ char* dumpScreenToSD(void) {
   bmpfileheader[5] = (unsigned char)(filesize>>24);
   if(SDCardAvailable && bmpScreenSDCardRequest)
     bmpFile.write(bmpfileheader, sizeof(bmpfileheader));
+
   if(hexScreenRequest)
-    {
-    Serial.println("-----   Start BMP in HEX   -----");
-    for (int k=0; k<14; k++) {
-      Serial.print(bmpfileheader[k] < 16 ? "0" : "");
-      Serial.print(bmpfileheader[k], HEX);
-      Serial.print(" ");
-      }
-    }
+      for (int k=0; k<14; k++)
+          hexout(bmpfileheader[k], 0);
+
   //Format info header and write
   ihFrame.ih.biSize = sizeof(xBITMAPINFOHEADER);
   ihFrame.ih.biWidth = width;
@@ -564,16 +564,10 @@ char* dumpScreenToSD(void) {
 
   if(SDCardAvailable && bmpScreenSDCardRequest)
     bmpFile.write(linebuf, 40);
+
   if(hexScreenRequest)
-    {
-    for (int k=0; k<40; k++)
-      {
-      Serial.print(ihFrame.ihData[k] < 16 ? "0" : ""); // leading zero
-      Serial.print(ihFrame.ihData[k], HEX);
-      Serial.print(" ");
-      }
-    Serial.println("");  // Adds a lf into hex file after header
-    }
+      for (int k=0; k<40; k++)
+          hexout(ihFrame.ihData[k], 0);
 
 #if BMP_DEBUG
   //Dump the infoheader to sys mon
@@ -604,6 +598,12 @@ char* dumpScreenToSD(void) {
       linebuf[j*3] = b;
       linebuf[j*3 + 1] = g;
       linebuf[j*3 + 2] = r;
+      if(hexScreenRequest)
+          {
+          hexout(b, 0);   // hexout will take care of making into Intel hex lines
+          hexout(g, 0);          
+          hexout(r, 0); 
+          }
 #if BMP_DEBUG
       if(i==238){       //(j==0 && i==60) {
         Serial.print("colorPixel at x=");
@@ -636,21 +636,12 @@ char* dumpScreenToSD(void) {
       {
       bmpFile.write(linebuf, linesize);  // Write the linebuf
       }
-    if(hexScreenRequest)
-      {
-      for (int k=0; k<linesize; k++)
-        {
-        Serial.print(linebuf[k] < 16 ? "0" : "");
-        Serial.print(linebuf[k], HEX);
-        Serial.print(" ");
-        }
-      Serial.println("");  // This adds lf in hex, but makes it line for line
-      }
+     // Note - Intel hex file writing is above with getting r, b, g
   }    // End, over all lines
 
   if(hexScreenRequest)
     {
-    Serial.println("-----   End BMP in HEX   -----");
+    hexout(0, 2);    // End of Intel Hex file
     hexScreenRequest = false;
     }
   if(SDCardAvailable)
@@ -741,3 +732,103 @@ void  exploreSDCard(void)
     return (((r & 0x3E00) << 2) | ((g & 0x3F00) >>3) | ((b & 0x3E00) >> 9));
   }
 #endif
+
+#define MAXHEXLINE 16    /* the maximum number of bytes to put in one line */
+/* Produce intel hex file output.
+ * Call this routine with each byte to output.  The Intel hex file is 
+ * extended for 32-bit addressing of location. Type 4 records are inserted
+ * every 65536 bytes to update the high 16 bits of address.  Addresses start at 0.
+ * Output is only to Serial.print().  Lines are separated by just LF (not CR-LF).
+ * 
+ * The input byte is an unsigned 8-bit number on (0,255).  The output is all ASCII
+ * characters, sent over the Teensy Arduino Serial.  This is sent as neeed, not with
+ * each byte.  Typically, this means every MAXHEXLINE bytes, but not always.
+ *
+ * doWhat==0  Setup a byte of data for transmission, increment position and address.
+ *            Then send data and address extensions as appropriate.
+ * doWhat==1  Open 'file', set position ('memory address') to 0.
+ * doWhat==2  Close 'file', send EOF string.
+ */
+int16_t hexout(uint8_t byte, uint16_t doWhat)
+    {
+    static uint8_t byteBuffer[MAXHEXLINE];
+    static uint16_t high16, low16, startLow16;   // Intel hex address
+    static uint8_t bufferPosition;
+    uint16_t sum, i, nBytes;
+
+    if (doWhat==1)    // Initialize, send type 4 record, ignore byte
+        {
+        high16 = 0;   // high 16 bits of position
+        low16 = 0;    // lsb 16 bits
+        startLow16 = 0;  // Address of low16 corresponding to bufferPosition==0
+        bufferPosition = 0;  // Byte buffer position for next write (0, 31)
+        Serial.println(":020000040000FA");  // Extended address (high16) = 0
+        return -1;
+        }
+
+    byteBuffer[bufferPosition++] = byte;  // byte ready for output
+    if(++low16 == 0) high16++;;  // Bump byte count
+
+    // doWhat 0 and 2 may require sending a line of hex, possibly less than 32 bytes
+    //         Line buffer has 32       or    End of File and bytes to write     or  End of high16 page
+    if ( (bufferPosition >= MAXHEXLINE) || ((doWhat==2) && (bufferPosition > 0)) || (low16==0) )
+        {
+        // it's time to dump the buffer to a line in the file
+        // ':'  ByteCount  StartLow16   RecordType=0   Data   CheckSum
+        Serial.print(":");
+        print2hex(bufferPosition);  // Byte count
+        print4hex(startLow16);      // starting address
+        Serial.print("00");         // Record type
+
+        sum = bufferPosition + ((startLow16>>8)&0XFF) + (startLow16&0XFF);
+        for (i=0; i < bufferPosition; i++)
+            {
+            print2hex(byteBuffer[i]);
+            sum += (uint16_t)byteBuffer[i];
+            }
+        /* Checksm byte is two's complement of sum (one plus bit inversion).
+         * Serial.println((uint8_t)(1+(0XFF^(uint8_t) 0 )), HEX);   // )X00  Check Sum
+         * Serial.println((uint8_t)(1+(0XFF^(uint8_t) 1 )), HEX);   // 0XFF
+         * Serial.println((uint8_t)(1+(0XFF^(uint8_t) 2 )), HEX);   // 0XFE
+         * Serial.println((uint8_t)(1+(0XFF^(uint8_t) 254 )), HEX); // 0X02
+         * Serial.println((uint8_t)(1+(0XFF^(uint8_t) 255 )), HEX); // 0X01 */
+        print2hex((uint8_t)(1+(0XFF^(uint8_t)sum)));  // Check Sum
+        Serial.println("");
+        startLow16 = low16;
+        nBytes = bufferPosition;
+        bufferPosition = 0;
+        if(low16==0)  // Currently adding last byte of a high16 page
+            {
+            Serial.print(":02000004");  // Send type 4 32-bit extended address
+            print4hex(high16);
+            print2hex((uint8_t)(1 + (0XFF^(uint8_t)(6+high16))));
+            Serial.println("");
+            }
+        }
+    if (doWhat==2)
+        {
+        Serial.print(":00000001FF\n");  // End of File record
+        high16 = 0; 
+        low16 = 0; 
+        startLow16 = 0;
+        bufferPosition = 0;
+        return -2;
+        }
+    return nBytes;
+    }
+
+// Serial print 2 hex numbers to make up a single byte, 8-bit h
+void print2hex(uint8_t h)
+    {
+    Serial.print(h < 16 ? "0" : "");  // Leading zero
+    Serial.print(h, HEX);             // One or two hex characters
+    }
+
+// Serial print 4 hex numbers to make up a two byte, 16-bit h
+void print4hex(uint16_t h)
+    {
+    Serial.print(h < 4096 ? "0" : "");  // Leading zeros
+    Serial.print(h < 256 ? "0" : "");  
+    Serial.print(h < 16 ? "0" : "");  
+    Serial.print(h, HEX);             // 1, 2, 3 or 4 hex characters
+    }

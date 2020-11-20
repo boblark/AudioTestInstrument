@@ -60,10 +60,12 @@
           Added variable sample averaging for ASA.
    v0.8.2 Added new serial commands, corrected WGNoise level, New Serial Commands: INSTRUMENT, SIGGEN, 
           VECTORVM, SPECTRUM, SCREENSAVE.
+   v0.8.3 Fixed signal on/off functions, added R+jX to "What". Added 2dB/div in SA.  Other misc fix.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
-#define CURRENT_VERSION 82
+// ALSO - Catch  topLine2(void) around the bottom of AVNA8lcd.ino.  It is messy to convert from CURRENT_VERSION.
+#define CURRENT_VERSION 83
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -390,7 +392,7 @@ AudioSynthWaveform       waveform1;       // Test signal
 AudioSynthWaveform       waveform2;       // 90 degree
 AudioEffectMultiply      mult1;           // I mixer
 AudioEffectMultiply      mult2;           // Q mixer
-AudioSynthWaveformDc     DC1;             // Gain control for DAC output
+AudioSynthWaveformDc     DC1;             // Gain for DAC output (future, but USE mixer2)
 AudioEffectMultiply      multGainDAC;
 AudioOutputI2S           i2s2;
 AudioRecordQueue         queueNN[4];      // Two pairs of I and Q
@@ -493,6 +495,14 @@ struct measureFreq {
   30000.0f, 30001.0f,  1, AMP_PHASE,  AMP_PHASE,
   40000.0f, 39998.0f,  1, AMP_PHASE,  AMP_PHASE
 };
+
+#if 0
+//                     This is not going to work.  Take back out when confirmed  <<<<<<<
+// Rev 0.93 added correction for isolation in transmisssion path.
+// This requires two numbers for each frequency being used, one for I and one for Q.
+double correctIsolationI[14];
+double correctIsolationQ[14];
+#endif
 
 // Some data items to support the AVNA looking like a nanoVNA to a
 //nanoVNA-saver program on a serial link.
@@ -925,7 +935,12 @@ void setup()
 
   // Each additional AudioMemory uses 256 bytes of RAM (dynamic memory).
   // This stores 128-16-bit ints.   Dec 16 usage 8
-  AudioMemory(35);   // Last seen peaking at 20
+  AudioMemory(35);           // Last seen peaking at 20
+ 
+  mixer2.gain(0, 0.0);       // Turn off signal generatrs
+  mixer2.gain(1, 0.0);       // Turn off AVNA source signal 
+  DC1.amplitude(dacLevel);   // Gain control for DAC output
+  
   AudioNoInterrupts();     // Use to synchronize all audio
   // Enable the SGTL5000 audio CODEC
   audioShield.enable();
@@ -966,7 +981,7 @@ void setup()
   firIn1.begin(lp2300_100K, 100);
   firIn2.begin(lp2300_100K, 100);
   AudioInterrupts();
-  DC1.amplitude(dacLevel);                          // Gain control for DAC output
+
   //factorFreq is global that corrects any call involving absolute frequency, like waveform generation.
   factorFreq = FBASE / sampleRateExact;    // 44117.65f /
 
@@ -1412,6 +1427,7 @@ void loop()
      }
   }
 //  =================  END LOOP()  ======================
+
 
 // Returns the 1 of N touch boxes that is most likely for the x-value given by px.
 // N=6 for bottom menus and N=7 for up/down boxes.

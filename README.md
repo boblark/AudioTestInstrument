@@ -1,7 +1,7 @@
 # AudioTestInstrument
 Follow on from W7PUA Audio Vector Network Analyzer adding other instruments.
 
-WORK N PROGRESS -  Beta test level for rev 0.81.  Bob  W7PUA
+WORK N PROGRESS -  Beta test level for rev 0.83.  Bob  W7PUA
 
 ### Version 0.80 & 0.81 Change Summary
 
@@ -16,6 +16,10 @@ All capabilities of Version 0.70 plus the following:
 * SINAD and S/N measures as part of Spectrum Analyzer
 * Correction of several bugs, such as the handling of double-precision constants.
 * Inclusion of external third-party libraries with this download for easy install.
+
+With Version 0.83 the following is available
+* Serial control of all the functionality that came with 0.81.
+* A serial command to download a .BMP screen image with Intel Hex ASCII format.
 
 ![Control Screens, AVNA Test Instrument](/images/AVNA_2Scr1.gif)
 
