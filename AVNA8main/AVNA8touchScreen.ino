@@ -539,11 +539,11 @@ void tToASGn(void)
   * Level Down     y = 165 to 190 pixel
   * All: x=(60, 100)  (100,140)  (140, 180)  (180,220)  (220, 260) pixels
   */
-  boxes7(5, 27);  // Draw the up boxes
+  boxes7(5, 27, "+");  // Draw the up boxes
   //                       num    nDigits xLeft yTop printLeadingZeros color
   printDigits(asg[currentSigGen].freq, 5, 75, 54, false, ILI9341_YELLOW);
-  boxes7(5, 75);
-  boxes7(4, 117);
+  boxes7(5, 75, "-");
+  boxes7(4, 117, "+");
   if (asg[currentSigGen].ASGoutputOn)
      printDigits((uint16_t)(1000.0f*asg[currentSigGen].amplitude), 4, 75, 144, true, ILI9341_YELLOW);
   else
@@ -552,7 +552,7 @@ void tToASGn(void)
   tft.setFont(Arial_18);
   tft.print(".");
 
-  boxes7(4, 165);
+  boxes7(4, 165, "-");
 
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
@@ -725,7 +725,7 @@ void tToVVM(void)
   * Phase Down     y = 165 to 190 pixel
   * All: x=(60, 100)  (100,140)  (140, 180)  (180,220)  (220, 260) pixels
   */
-  boxes7(4, 117);
+  boxes7(4, 117, "+");
   printDigits((uint16_t)(10.0f*fabsf(phaseOffset)), 4, 75, 144, true, ILI9341_YELLOW);
   tft.setCursor(175, 142);
   tft.setFont(Arial_18);
@@ -735,7 +735,7 @@ void tToVVM(void)
     tft.setCursor(60, 142);
     tft.print("-");
     }
-  boxes7(4, 165);
+  boxes7(4, 165, "-");
 
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
@@ -859,7 +859,8 @@ void tToASAFreq(void)
 
   setSample(freqASA[ASAI2SFreqIndex].rateIndex);
   countMax = freqASA[ASAI2SFreqIndex].SAnAve;
-  tft.fillRect(0, 38, tft.width(), 200, ILI9341_BLACK);
+  tft.fillRect(0, 15, 301, 223, ILI9341_BLACK);
+  tft.fillRect(0, 0, 25, 15, ILI9341_BLACK);  // Catch the "0"
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
   tft.setCursor(0, 38);
@@ -906,7 +907,8 @@ void tToASAAmplitude(void)
   if((currentMenu == 14 ) && (menuItem == 4))
     ASAdbOffset -= 5.0f;
 
-  tft.fillRect(0, 38, tft.width(), 200, ILI9341_BLACK);
+  tft.fillRect(0, 15, 301, 223, ILI9341_BLACK);
+  tft.fillRect(0, 0, 25, 15, ILI9341_BLACK);  // Catch the "0"
   tft.setTextColor(ILI9341_YELLOW);
   tft.setFont(Arial_12);
   tft.setCursor(0, 38);
@@ -964,6 +966,9 @@ void tDoSingleFreq(void)
   tft.setFont(Arial_14);
   tft.setCursor(20, 62);
   tft.print("Single Frequency Measurements");
+  tft.setFont(Arial_16);
+  tft.setCursor(70, 120);
+  tft.print("Freq = ");  tft.print(FreqData[nFreq].freqHz, 0); tft.print(" Hz");
   clearStatus();
   }
 
@@ -1484,8 +1489,11 @@ void finish_tFreq(void)
   {
   tft.fillRect(0, 38, tft.width(), 161, ILI9341_BLACK);
   tft.setTextColor(ILI9341_YELLOW);
-  tft.setFont(Arial_24);
-  tft.setCursor(0, 60);
+  tft.setFont(Arial_14);
+  tft.setCursor(20, 62);
+  tft.print("Single Frequency Measurements");
+  tft.setFont(Arial_16);
+  tft.setCursor(70, 120);
   tft.print("Freq = ");  tft.print(FreqData[nFreq].freqHz, 0); tft.print(" Hz");
   saveStateEEPROM();
   topLines();
@@ -1587,26 +1595,45 @@ void tNothing(void)
  * are drawn, the entire araeis cleared to allow the fill1o7() to add a fill
  * to one of the boxes (such as feedback for touching a box).
  */
-void boxes7(uint16_t nBox, int16_t yTop)
+// void boxes7(uint16_t nBox, int16_t yTop)  Was, up tov0.83
+void boxes7(uint16_t nBox, int16_t yTop, char* pc)
   {
   switch (nBox)
     {
     case 4:
       tft.fillRect(60, yTop+1, 160, 25, ILI9341_BLACK);
       for (int ii=1; ii<5; ii++)
-        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
+        {
+        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_GREEN);
+        tft.setTextColor(ILI9341_WHITE);
+        tft.setFont(Arial_10);
+        tft.setCursor(36+40*ii, yTop+7);
+        tft.print(pc);
+	    }
       break;
 
     case 5:
       tft.fillRect(60, yTop+1, 200, 25, ILI9341_BLACK);
       for (int ii=1; ii<6; ii++)
-        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
+        {
+        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_GREEN);
+        tft.setTextColor(ILI9341_WHITE);
+        tft.setFont(Arial_10);
+        tft.setCursor(36+40*ii, yTop+7);
+        tft.print(pc);
+        }
       break;
 
     case 7:
       tft.fillRect(20, yTop+1, 280, 25, ILI9341_BLACK);
       for (int ii=0; ii<8; ii++)
-        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_WHITE);
+        {
+        tft.drawRect(21+40*ii, yTop, 38, 25, ILI9341_GREEN);
+        tft.setTextColor(ILI9341_WHITE);
+        tft.setFont(Arial_10);
+        tft.setCursor(36+40*ii, yTop+7);
+        tft.print(pc);
+        }
       break;
 
     default:

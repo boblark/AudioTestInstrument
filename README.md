@@ -21,6 +21,8 @@ With Version 0.83 the following is available
 * Serial control of all the functionality that came with 0.81.
 * A serial command to download a .BMP screen image with Intel Hex ASCII format.
 
+Version 0.84 is primarily cosmetic fixes.  All touch buttons are green, all annotated.
+
 ![Control Screens, AVNA Test Instrument](/images/AVNA_2Scr1.gif)
 
 ![Signal Generator Screens, AVNA Test Instrument](/images/AVNA_2Scr2.gif)

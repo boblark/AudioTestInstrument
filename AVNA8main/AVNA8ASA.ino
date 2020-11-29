@@ -236,9 +236,9 @@ void show_spectrum()
   tft.fillRect(spectrum_x-5, spectrum_y-1, 262, spectrum_height+2, ILI9341_BLACK);
   // prepare_spectrum_display();
   for(int ii=0; ii<=160; ii+=40)
-      tft.drawFastHLine (spectrum_x-5, spectrum_y+ii,  259, ILI9341_ORANGE);
+      tft.drawFastHLine (spectrum_x-5, spectrum_y+ii,  260, ILI9341_ORANGE);
   for(int ii=20; ii<=160; ii+=40)
-      tft.drawFastHLine (spectrum_x, spectrum_y+ii,  254, ILI9341_ORANGE);
+      tft.drawFastHLine (spectrum_x, spectrum_y+ii,  255, ILI9341_ORANGE);
   for(float jf=0.0f; jf<=241.0f; jf+=42.66667f)
       tft.drawFastVLine (spectrum_x+(int)(0.5+jf), spectrum_y, 165, ILI9341_ORANGE);
   for(float jf=21.33333f; jf<241.0f; jf+=42.66667f)

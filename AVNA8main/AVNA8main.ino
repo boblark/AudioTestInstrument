@@ -65,7 +65,7 @@
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
 // ALSO - Catch  topLine2(void) around the bottom of AVNA8lcd.ino.  It is messy to convert from CURRENT_VERSION.
-#define CURRENT_VERSION 83
+#define CURRENT_VERSION 84
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -337,7 +337,7 @@ void tVOutCal(void);
 // 2D array of function pointers to be called when a menu item is touched
 // 15 menus and 6 buttons per menu
 void (*t[22][6])(void) =
-{ tToInstrumentHome, tToAVNA, tToVVM, tToASA, tToASGHome, tService,                    // 0 INSTRUMENT HOME
+{ tToInstrumentHome, tToAVNAHome, tToVVM, tToASA, tToASGHome, tService,                    // 0 INSTRUMENT HOME
   tToInstrumentHome, tDoSingleFreq, tDoSweep, tWhatIntro, tDoSettings, tDoHelp,        // 1 AVNA Home
   tToAVNAHome, tFreqDown, tFreqUp, tFreq0, tDoSingleZ, tDoSingleT,                     // 2 Single Freq
   tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tDoSweepZ, tDoSweepT,           // 3 Sweep Freq
