@@ -1,13 +1,3 @@
-#Tex intermediate files
-*.aux
-*.bib
-*.dvi
-*.fdb_latexmk
-*.fls
-*.out
-*.pdf
-*.synctex.gz
-
 # Prerequisites
 *.d
 

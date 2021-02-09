@@ -99,8 +99,8 @@ void doTSingle(bool out)
   delay(ZDELAY + (unsigned long)(1000.0 / FreqData[nFreq].freqHz));
   measureT();      // result is Tmeas
   T[nFreq] = Tmeas;
-  
-  LCDPrintSingleT(nFreq);
+  //serialPrintT(nFreq);  // rev 0.84 Temp put into LCD Print
+  LCDPrintSingleT(nFreq);  
   }
 
 // doTSweep() measures transmission at all sweep frequencies. The calling
@@ -264,6 +264,15 @@ void measureT(void)
   // Now normalize these gains to the through path gain from CAL.
   vGainNorm = vGain / FreqData[nFreq].thruRefAmpl;
   vPhaseNorm = vPhase - FreqData[nFreq].thruRefPhase;
+
+  Serial.print("nFreq="); Serial.print(nFreq);  
+  Serial.print("  amplitudeV="); Serial.print(amplitudeV, 6);
+  Serial.print("  amplitudeR="); Serial.print(amplitudeR, 6);// <<<< PROBLEM
+  Serial.print("  vRatio="); Serial.print(FreqData[nFreq].vRatio, 6);
+  Serial.print("  thruRefAmpl="); Serial.print(FreqData[nFreq].thruRefAmpl  , 6);  
+  Serial.print("  vGain="); Serial.print(vGain, 6);
+  Serial.print("  vGainNorm="); Serial.println(vGainNorm, 6);
+
   if (vPhaseNorm < (-180.0))
      vPhaseNorm += 360.0;
   else if (vPhaseNorm > 180.0)
@@ -331,6 +340,12 @@ boolean getFullDataPt(void)
 
     amplitudeV = sqrtf( (float32_t) (superAveNN[1] * superAveNN[1] + superAveNN[0] * superAveNN[0]) );
     amplitudeR = sqrtf( (float32_t) (superAveNN[3] * superAveNN[3] + superAveNN[2] * superAveNN[2]) );
+    
+    
+    Serial.print("superAveNN[3]="); Serial.print(superAveNN[3], 6);
+    Serial.print("superAveNN[2]="); Serial.println(superAveNN[2], 6);
+    
+    
     // Minus signs reflect the hookup of the inputs to U1A and U1D:
     phaseV = r2df(atan2f(-(float32_t)superAveNN[0], -(float32_t)superAveNN[1]));
     phaseR = r2df(atan2f( (float32_t)superAveNN[2],  (float32_t)superAveNN[3]));

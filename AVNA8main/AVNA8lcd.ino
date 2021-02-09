@@ -353,7 +353,7 @@ void LCDPrintSingleT(uint16_t nfr)
     tft.setTextColor(ILI9341_WHITE);
     tft.setFont(Arial_13);
     tft.setCursor(20, 38);
-    tft.print("Max Freq, kHz ");
+    tft.print("Frequency = ");
     if     (FreqData[nfr].freqHz < 100.0f)
        tft.print(FreqData[nfr].freqHz, 2);
     else if(FreqData[nfr].freqHz < 1000.0f)
@@ -364,9 +364,9 @@ void LCDPrintSingleT(uint16_t nfr)
 
     tft.setCursor(20, 62);
     if (uSave.lastState.iRefR==R50)
-       tft.print("Ref=50.0 Ohm");
+       tft.print("Ref = 50.0 Ohm");
     else
-       tft.print("Ref=5.0 KOhm");
+       tft.print("Ref = 5.0 KOhm");
 
     tft.setCursor(20, 86);
     tft.print("Voltage Gain = ");
@@ -384,6 +384,31 @@ void LCDPrintSingleT(uint16_t nfr)
     tft.print(PT, 2);
     tft.print(" deg");
     }
+ 
+    if(uSave.lastState.tsData)
+       {
+       if(annotate)
+          {
+          Serial.print("V Ratio = "); Serial.print(MT, 8);
+          Serial.print("  Phase = "); Serial.print(PT, 3); Serial.println(" deg");
+          }
+       else
+          {
+          Serial.print(MT, 8); Serial.print(","); Serial.println(PT, 3);
+          }
+       }
+    else
+       {
+       if(annotate)
+          {
+          Serial.print("V Ratio = "); Serial.print(MTdB, 3);
+          Serial.print(" dB  Phase = "); Serial.print(PT, 3); Serial.println(" deg");
+          }
+       else
+          {
+          Serial.print(MTdB, 8); Serial.print(","); Serial.println(PT, 3);
+          }
+       }
   }
 
 void topLines(void)
@@ -413,7 +438,7 @@ void topLine2(void)
   tft.fillRect(0, 22, tft.width(), 16, ILI9341_BLACK);
   tft.setTextColor(ILI9341_WHITE);
   tft.setCursor(5, 22);
-  tft.print("Ver 0.84 de W7PUA");
+  tft.print("Ver 0.85 de W7PUA");
   tft.setTextColor(ILI9341_YELLOW);
   }
 

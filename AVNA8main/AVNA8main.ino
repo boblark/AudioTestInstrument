@@ -61,11 +61,13 @@
    v0.8.2 Added new serial commands, corrected WGNoise level, New Serial Commands: INSTRUMENT, SIGGEN, 
           VECTORVM, SPECTRUM, SCREENSAVE.
    v0.8.3 Fixed signal on/off functions, added R+jX to "What". Added 2dB/div in SA.  Other misc fix.
+   v0.8.4 Corrected cal for single frequency transmission.
+   v0.8.5 Corrected output for Transmission AVNA measurements.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
 // ALSO - Catch  topLine2(void) around the bottom of AVNA8lcd.ino.  It is messy to convert from CURRENT_VERSION.
-#define CURRENT_VERSION 84
+#define CURRENT_VERSION 85
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -116,22 +118,6 @@
    6  - Touch CS
    24 - Touch IRQ
 */
-
-#if 0
-LIBRARY SUMMARY fromCompile/Show Compile Detail:
-
-Multiple libraries were found for "SD.h"
- Used: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD
- Not used: /home/bob/arduino-1.8.13/libraries/SD
-Using library Audio at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Audio
-Using library SPI at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SPI
-Using library SD at version 1.2.2 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SD
-Using library SerialFlash at version 0.5 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/SerialFlash
-Using library Wire at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/Wire
-Using library EEPROM at version 2.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/EEPROM
-Using library XPT2046_Touchscreen at version 1.3 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/XPT2046_Touchscreen
-Using library ILI9341_t3 at version 1.0 in folder: /home/bob/arduino-1.8.13/hardware/teensy/avr/libraries/ILI9341_t3
-#endif
 
 #include <stdio.h>
 #include <math.h>
@@ -346,7 +332,8 @@ void (*t[22][6])(void) =
   tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                        // 6 Help
   tToAVNAHome, tDoHelp, tDoHelp2, tNothing, tNothing, tNothing,                        // 7 More Help
   tToAVNAHome, tNothing, tNothing, tNoLF, tUseLF, tDoWhatPart,                         // 8 What Component
-  tToAVNAHome, tNothing, tNothing, tNothing, tCalCommand, tDoSingleT,                  // 9 Single T
+  // Rev 84 moved SingleT to avoid accidental taps of menu item
+  tToAVNAHome, tNothing, tNothing, tDoSingleT, tCalCommand, tNothing,                  // 9 Single T
   tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepT,         // 10 Sweep T
   tToAVNAHome, tSweepFreqDown, tSweepFreqUp, tNothing, tCalCommand, tDoSweepZ,         // 11 Sweep Z
   tToInstrumentHome,  tToASAFreq, tToASAAmplitude, tToASASinad, tNothing, tNothing,    // 12 ASA
@@ -1095,7 +1082,7 @@ void setup()
   while( !serInBuffer.isEmpty() )
     serInBuffer.pop();
 
-  instrument = ALL_IDLE;
+  // instrument = ALL_IDLE;
   setSample(S96K);                                      mmmm=millis();
   }
 

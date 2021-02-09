@@ -1546,8 +1546,9 @@ void tDoSingleT(void)
     tft.setCursor(20, 152);
     tft.print("and hit Cal below.");
     }
-  // Actual measurement will occur in loop().  Here we enable continuous measurement
-  avnaState = TSINGLE;
+  else
+    // Actual measurement will occur in loop().  Here we enable continuous measurement
+    avnaState = TSINGLE;
   }
 
 void tSetParams(void)
@@ -1683,8 +1684,8 @@ void writeMenus(uint16_t nMenu)
   uint16_t i;
   // Room for 1 menu sets of 6 menus each, and each menu has up to 8 chars + 0.
   static char line1[22][6][9]={
-    " ", "  AVNA", " Vector", "Spectrum", " Signal", " Service", // Set 0
-    "Instrmnt", " Single", " Sweep", "  What", "  Set", " Help", // Set 1
+    " ", "  AVNA", " Vector", "Spectrum", " Signal", " Service", // Set 0 Instrument home
+    "Instrmnt", " Single", " Sweep", "  What", "  Set", " Help", // Set 1 AVNA home
     " Back", "  Freq", "  Freq", "  Freq", " Meas", " Meas ",    // Set 2
     " Back", "Disp Frq", "Disp Frq", " ", " Meas", " Meas",      // Set 3
     " Back", "    50", "    5K", " ", " ", " ",                  // Set 4
@@ -1692,7 +1693,7 @@ void writeMenus(uint16_t nMenu)
     " Back", " Screen", " Screen", " ", " ", " ",                // Set 6
     " Back", " Screen", " Screen", " ", " ", " ",                // Set 7 Help
     " Back", " ", " ", "  No 10,", " Use 10,", " Search",        // Set 8 What?
-    " Back", " ", " ", " ", "  Cal", " Meas",                    // Set 9
+    " Back", " ", " ", " Meas ", "  Cal", "",                    // Set 9 Single T meas
     " Back", "Disp Frq", "Disp Frq", " ", "  Cal", " Single",    // Set 10
     " Back", "Disp Frq", "Disp Frq", " ", "  Cal", " Single",    // Set 11
     "Instrmnt", " Freq", "Amplitde", " SINAD ", " ", " ",        // Set 12 ASA Home
@@ -1716,7 +1717,7 @@ void writeMenus(uint16_t nMenu)
     " ", "    1", "    2", " ", " ", " ",
     " ", "    1", "    2", " ", " ", " ",
     " ", " ", " ", "20 or 50", "20 & 50", " Value",
-    " ", " ", " ", " ", " ", "    T",
+    " ", " ", " ", "    T ", " ", "",
     " ", "  Down", "   Up", " ", " ", "T Sweep",
     " ", "  Down", "   Up", " ", " ", "Z Sweep",
     " Home", " ", " ", " Toggle ", " ", " ",

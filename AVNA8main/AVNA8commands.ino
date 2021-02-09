@@ -225,7 +225,11 @@ void VVMCommand(void)
 void ASACommand(void)
   {
   char *arg;
-
+  if(instrument != ASA)
+     {
+     Serial.print("Error: Execute \"INSTRUMENT 2\" first");
+     return;
+     }
   instrument = ASA_IDLE;
 /*  arg = SCmd.next();      // Not Needed??
   if (arg != NULL)
@@ -333,6 +337,12 @@ void ScreenSaveCommand(void)
 void TransmissionCommand()
   {
   char *arg;
+  
+  if(instrument != AVNA)
+     {
+     Serial.print("Error: Execute \"INSTRUMENT 0\" first");
+     return;
+     }
   doingNano = false;
   doRun = RUNNOT;  // Stop any measurements
   uSave.lastState.ZorT = TRANSMISSION;
@@ -413,6 +423,11 @@ void CalCommand(void)
 // baseI = 1 for all freq
 void CalCommand0(uint16_t baseI)
   {
+  if(instrument != AVNA)
+     {
+     Serial.print("Error: Execute \"INSTRUMENT 0\" first");
+     return;
+     }
   clearStatus();
   doingNano = false;
   doRun = RUNNOT;  // Stop any measurements
@@ -770,6 +785,11 @@ void setSwitch(uint16_t what)
 void ZmeasCommand()
   {
   char *arg;
+  if(instrument != AVNA)
+     {
+     Serial.print("Error: Execute \"INSTRUMENT 0\" first");
+     return;
+     }
   // Complex RR50(uSave.lastState.valueRRef[1], 0.0);
   // Complex RR5K(uSave.lastState.valueRRef[2], 0.0);
   doingNano = false;

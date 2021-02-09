@@ -98,8 +98,6 @@ void doFFT(void)
         specMaxFreq = 0.05f + ( (float32_t)iiMax - (2-R)/(1+R) )*freqASA[ASAI2SFreqIndex].sampleRate/1024.0f;
         }
 
-
-
       /* SINAD & Distortion Analysis use the SA with sample rate of 12KHz.  This gives bin spacing of
        * 11.71875 Hz.  The bin85 is at 996.094 and will be used as notch center.  Notch out
        * 5 bins and add the center 3 together as signal.  Cut the bottom off at 300 Hz (bin26 is 305)
