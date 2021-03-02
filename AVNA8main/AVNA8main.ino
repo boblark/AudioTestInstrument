@@ -63,11 +63,12 @@
    v0.8.3 Fixed signal on/off functions, added R+jX to "What". Added 2dB/div in SA.  Other misc fix.
    v0.8.4 Corrected cal for single frequency transmission.
    v0.8.5 Corrected output for Transmission AVNA measurements.
+   v0.8.6 Catch EEPROM version errors and update EEPROM per CURRENT_VERSION.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
 // ALSO - Catch  topLine2(void) around the bottom of AVNA8lcd.ino.  It is messy to convert from CURRENT_VERSION.
-#define CURRENT_VERSION 85
+#define CURRENT_VERSION 86
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -857,6 +858,7 @@ void setup()
      loadStateEEPROM();
      }
 #endif
+
   saveStateEEPROM();   // Initialize EEPROM, coming from init values for saveState
 
   // SD Card, see what is available
@@ -1493,7 +1495,7 @@ void asgPrintAmplitude(void)
 // is unioned with the saveState structure.
 void saveStateEEPROM(void)
   {
-  // uSave.lastState.int8version = 70;
+  uSave.lastState.int8version = CURRENT_VERSION;  // Keep tracking this
 
   uint16_t i;
   for (i = 0; i < sizeof(saveState); i++)
@@ -1535,8 +1537,9 @@ void loadStateEEPROM(void)
   // At this point, if version is out-of-date, there will be garbage bytes read from the EEPROM
   // Now update the RAM copy and then save to EEPROM to fill those bytes.
   flag = 0;  // Nothing to write yet
-  if(uSave.lastState.int8version < 70)   // EEPROM data is "way" out-of-date
+  if( (uSave.lastState.int8version < 70) || (uSave.lastState.int8version > CURRENT_VERSION + 5) )
      {
+	 // EEPROM data is "way" out-of-date  OR version info is corrupted, like 255
      // Cal data save was added with version 0.70.  Default values are here
      // but should be replaced by doing a careful "CALSAVE 0 nAve" and "CALSAVE 1 nAve" using
      // control from a serial terminal, Arduino or otherwise.
@@ -1548,14 +1551,14 @@ void loadStateEEPROM(void)
        uSave.lastState.EthruRefAmpl[i] = 1.0;
        uSave.lastState.EthruRefPhase[i] = 0.0;
        }
-     uSave.save_vnaF[0] = 0X3B;
+     uSave.save_vnaF[0] = 0X3B;  uSave.save_vnaF[1] = 0X43;
      uSave.lastState.int8version = 70;     // Mark as version 0.70
      Serial.println("EEPROM data first updated to that of version 0.70");
      Serial.println("A new serial (not touch screen) CALSAVE 0 n  and  CALSAVE 1 n  are needed.");
      flag = 1;
      }
 
-  if(uSave.lastState.int8version < 80)   // EEPROM data is out-of-date
+  if(uSave.lastState.int8version < 80)   // EEPROM data structure is out-of-date
      {
      // Cal data save was added with version 0.70.  Default values are here
      // but should be replaced by doing a careful "CALSAVE 0 nAve" and "CALSAVE 1 nAve" using
@@ -1568,7 +1571,8 @@ void loadStateEEPROM(void)
      uSave.lastState.VVMCalConstant = 0.0000137798f;
      uSave.lastState.SAcalCorrectionDB = 4.5f;
      uSave.lastState.int8version = CURRENT_VERSION; 
-     Serial.println("EEPROM data has been updated to that of version 0.82");
+     Serial.print("EEPROM data has been updated to that of version 0.");
+     Serial.println(CURRENT_VERSION);
      Serial.println("including default cal values for Vin and Vout.");
      flag = 1;
      }
