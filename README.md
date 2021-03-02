@@ -1,7 +1,5 @@
-# AudioTestInstrument
+# AudioTestInstrument  -  Version 0.86
 Follow on from W7PUA Audio Vector Network Analyzer adding other instruments.
-
-WORK N PROGRESS -  Beta test level for rev 0.83.  Bob  W7PUA
 
 ### Version 0.80 & 0.81 Change Summary
 
@@ -22,6 +20,8 @@ With Version 0.83 the following is available
 * A serial command to download a .BMP screen image with Intel Hex ASCII format.
 
 Version 0.84 is primarily cosmetic fixes.  All touch buttons are green, all annotated.
+
+Version 0.86 fixes EEPROM version problems.
 
 ![Control Screens, AVNA Test Instrument](/images/AVNA_2Scr1.gif)
 
