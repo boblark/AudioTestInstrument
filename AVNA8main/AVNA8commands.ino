@@ -1601,6 +1601,32 @@ void AnnotateCommand()
     }
   }
 
+void StartupHelp()
+{
+  Serial.print("\nTypical terminal use:\n\
+  \t     MUST USE 'CARRIAGE RTN', SET BACK TO 'NEWLINE' WHEN DONE\n\n \
+  \tZ 50\t\timpedance measurement around 50 ohms, else Z 5000 ohms\n \
+  \tSWEEP\t\tsetup for sweep, else FREQ set a frequency\n\
+  \tCAL\t\tmust be run after change mode\n\
+  \tANNOTATE 0\tput in comma separated value for spreadsheet\n\
+  \tSERPAR 1 0\tseries RX outputted, parallellRX not\n\
+  \tRUN 1\t\trun 1 or # of times\n\
+  \n\
+  \tH or HELP \tmore commands\n\n");
+  
+  Serial.print("for NANOVANA: either cd ~/Documents/GitHub/nanovna-saver or find the folder\n \
+  \tthen\n \
+  \tPython3 nanovna-saver.py\n \
+  \tor\n\
+  \tin OS window double click 'nanovna-saver.py' , and in Geany select the gears\n");
+}
+
+void HelpCommand()
+{
+  StartupHelp();
+  SCmd.listCommands();
+}
+
 // ==============  Commands to support the nanoVNA interface  ===========
 
 // calCommand, for "cal", is different than regular serial Cal command for "CAL"

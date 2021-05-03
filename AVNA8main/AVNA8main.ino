@@ -120,13 +120,9 @@
    24 - Touch IRQ
 */
 
-#include <stdio.h>
-#include <math.h>
 #include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-// #include <SD.h>
-#include <SD_t3.h>
+#include "SdFatConfig.h"
+#include <SdFat.h>
 #include <SerialFlash.h>
 #include <EEPROM.h>
 #include <XPT2046_Touchscreen.h>
@@ -281,6 +277,9 @@
 // Signal generators can display volts or power into 50 Ohms
 #define VOLTS 0
 #define POWER 1
+
+#define SD_CONFIG SdioConfig(FIFO_SDIO)
+#define error(s) sd.errorHalt(&Serial, F(s))
 
 void tNothing(void);       // Declarations are required to reference function
 void tToInstrumentHome(void); //   by pointer, just like C
@@ -801,11 +800,11 @@ const int chipSelect = BUILTIN_SDCARD; // for Teensy 3.6
 bool SDCardAvailable = false;
 bool bmpScreenSDCardRequest = false;
 bool hexScreenRequest = false;
-File bmpFile;
+
 // set up variables using the SD utility library functions:
-Sd2Card card;
-SdVolume volume;
-SdFile root;
+FsFile bmpFile;
+SdFs sd;
+
 unsigned int mmmm;
 //===================================================================================
 // To use STL Vector container, we need to trap some errors.
@@ -834,8 +833,11 @@ void setup()
   panelLED(LSTART);
   panelLED(LRED);
   Serial.begin(9600);     // 9600 is not used, it is always 12E6
+  while(!Serial && millis()<6000){ //wait for lesser of Serial or 6 seconds.  Less sometimes misses version stuff
+    SysCall::yield();
+  }
   delay(1000);            //Wait for USB serial
-
+    
   // X.reserve(nn) immediately sets memory for nn X-elements.
   Z.reserve(201);
   Y.reserve(201);
@@ -862,9 +864,7 @@ void setup()
   saveStateEEPROM();   // Initialize EEPROM, coming from init values for saveState
 
   // SD Card, see what is available
-  exploreSDCard();
-  // Check if SD card is present and mark in SDCardAvailable
-  SDCardAvailable = card.init(SPI_HALF_SPEED, chipSelect);
+  exploreSDCard();   // Check if SD card is present and mark in SDCardAvailable
 
   tft.begin();
   tft.setRotation(SCREEN_ROTATION);
@@ -899,7 +899,8 @@ void setup()
   HWSERIAL4.println((float)CURRENT_VERSION/100.0);
   Serial.print("Voltage Check (expect 145 to 175): ");
   Serial.println(analogRead(21));
-
+  StartupHelp();  //print some helpful hints about using terminal
+  
 #if 0
   //    >>>>>>>>>>>>>  SOLVED  <<<<<<<<<<<<<<<<<<<<<<<<<
   // Following deals with a quirk of the Teensy in using double data types.  Contrary to C convention,
@@ -1006,6 +1007,9 @@ void setup()
   SCmd.addCommand("ANNOTATE", AnnotateCommand);
   SCmd.addCommand("VERBOSE", VerboseCommand);
   SCmd.addCommand("CALSAVE", CalSaveCommand);   // Added to save cal in EEPROM. 1 param. ver .70  Jan 2020
+  SCmd.addCommand("HELP", HelpCommand); 
+  SCmd.addCommand("H", HelpCommand);  
+  SCmd.addCommand("h", HelpCommand);  
   // A group of commands to allow the AVNA to mimic a nanoVNA to run nanoVNA-saver control program.
   // No caps in command names, fortunately for "sweep" etc.
   SCmd.addCommand("info", infoCommand);
@@ -1177,9 +1181,6 @@ void loop()
      ; // No processing required
      }
    }     // End if instrument==AVNA
-
-  // Check if SD card is present and mark in SDCardAvailable
-  SDCardAvailable = card.init(SPI_HALF_SPEED, chipSelect);
 
   // TOUCH SCREEN
   istouched = ts.touched();
@@ -2059,10 +2060,13 @@ double setI2SFreq(uint16_t iFreq)
   } __attribute__((__packed__)) tmclk;
   // 44117 is nickname for 44117.64706
 
-  if (F_PLL != 180000000)
+//#if (F_PLL == 180000000)
     Serial.println("ERROR: Teensy 3.6 F_PLL should be 180MHz, but is not.");
   const tmclk clkArr[numFreqs] = {{16, 1875}, {32, 1875}, {64, 1875}, {196, 3125}, {16, 255}, {128, 1875}, {219, 1604}, {32, 225}, {219, 802}};
-  /*  Info:
+//#elif (F_PLL==120000000)
+//  const tmclk clkArr[numFreqs] = {{xx, yyyy}, {xx, yyyy}, {xx, yyyy}, {205, 2179}, {8,   85}, {64,   625}, {128, 625 }, {16,75}, {xxx, yyy} };
+//#endif
+/*  Info:
   #define I2S0_MCR          (*(volatile uint32_t *)0x4002F100) // SAI MCLK Control Register
   #define I2S_MCR_DUF       ((uint32_t)1<<31)                  // Divider Update Flag
   #define I2S_MCR_MOE       ((uint32_t)1<<30)                  // MCLK Output Enable
@@ -2244,3 +2248,49 @@ char *valueString(float a, char *unitString[])
      strcpy(str1, "  ***  ");         // It can happen for X at 40 KHz
   return str1;
   }
+
+void printCardType() {
+  csd_t m_csd;
+  
+  sd.card()->readCSD(&m_csd);
+  
+  Serial.printf("Card type: ");
+  switch (sd.card()->type()) {
+    case SD_CARD_TYPE_SD1:
+      Serial.printf("SD1\n");
+      break;
+    case SD_CARD_TYPE_SD2:
+      Serial.printf("SD2\n");
+      break;
+    case SD_CARD_TYPE_SDHC:
+      if (sdCardCapacity(&m_csd) < 70000000) {
+        Serial.printf("SDHC\n");
+      } else {
+        Serial.printf("SDXC\n");
+      }
+      break;
+    default:
+      Serial.printf("Unknown\n");
+      break;
+  }
+}
+
+void dmpVol() {
+  uint32_t clusterCount = sd.clusterCount();
+  if (sd.fatType() <= 32) {
+    Serial.printf("Volume is FAT%d, ", int(sd.fatType()));
+  } else {
+    Serial.printf("\nVolume is exFAT, ");
+  }
+  //Serial.printf("sectorsPerCluster: ") << sd.sectorsPerCluster() << endl;
+  //Serial.printf("clusterCount:      ") << sd.clusterCount() << endl;
+  //Serial.printf("freeClusterCount:  ") << freeClusterCount << endl;
+  //Serial.printf("fatStartSector:    ") << sd.fatStartSector() << endl;
+  //Serial.printf("dataStartSector:   ") << sd.dataStartSector() << endl;
+    Serial.printf("size (Mbytes): %u\n", clusterCount/2048);
+  /*if (sd.dataStartSector() % m_eraseSize) {
+    Serial.printf("Data area is not aligned on flash erase boundary!\n");
+    Serial.printf("Download and use formatter from www.sdcard.org!\n");
+  }
+  //*/
+}

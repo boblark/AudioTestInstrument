@@ -112,7 +112,8 @@ class SerialCommand
         void setResponse(uint16_t);  // Response, if desired.  default:NO_RESPONSE
         void addCommand(const char *, void(*)());   // Add commands to processing dictionary
         void addDefaultHandler(void (*function)());    // A handler to call when no valid command received. 
-    
+        void listCommands();   //Print out the available commands
+        
     private:
         char inChar;                        // A character read from the serial stream 
         char buffer[SERIALCOMMANDBUFFER];   // Buffer of stored characters while waiting for terminator character
