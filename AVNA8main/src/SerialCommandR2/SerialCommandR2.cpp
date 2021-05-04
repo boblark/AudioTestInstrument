@@ -104,6 +104,17 @@ char *SerialCommand::next()
     return nextToken; 
     }
 
+//list the commands
+void SerialCommand::listCommands()  //mdr20200211 from my mods in old file on mdr20181123
+  {
+    uint16_t i; 
+
+    for (i=0; i<numCommand; i++){
+        Serial.println(CommandList[i].command);
+    }
+    
+  }
+  
 // This checks the Serial stream for characters, and assembles them into a buffer.  
 // When the terminator character (default '\r') is seen, it starts parsing the 
 // buffer for a prefix command, and calls handlers setup by addCommand() member

@@ -1,3 +1,2 @@
 #define SCREEN_ROTATION 1
-#define TOUCH_ROTATION  1
-
+#define TOUCH_ROTATION  3
