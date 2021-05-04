@@ -837,7 +837,7 @@ void setup()
     SysCall::yield();
   }
   delay(1000);            //Wait for USB serial
-    
+  
   // X.reserve(nn) immediately sets memory for nn X-elements.
   Z.reserve(201);
   Y.reserve(201);
@@ -900,7 +900,8 @@ void setup()
   Serial.print("Voltage Check (expect 145 to 175): ");
   Serial.println(analogRead(21));
   StartupHelp();  //print some helpful hints about using terminal
-  
+  mytest();
+
 #if 0
   //    >>>>>>>>>>>>>  SOLVED  <<<<<<<<<<<<<<<<<<<<<<<<<
   // Following deals with a quirk of the Teensy in using double data types.  Contrary to C convention,
@@ -1861,7 +1862,7 @@ void setSample(uint16_t nS)
   sampleRateExact = (float32_t)setI2SFreq(nS);  // It returns a double
   //factorFreq is global that corrects any call involving absolute frequency, like waveform generation.
   factorFreq = FBASE / sampleRateExact;
-#if DIAGNOSTICS
+#if true //DIAGNOSTICS
   Serial.print(" S Rate=");  Serial.print(sampleRateExact); Serial.print( "ff=");
   Serial.println(factorFreq);
 #endif
@@ -2060,12 +2061,12 @@ double setI2SFreq(uint16_t iFreq)
   } __attribute__((__packed__)) tmclk;
   // 44117 is nickname for 44117.64706
 
-//#if (F_PLL == 180000000)
-    Serial.println("ERROR: Teensy 3.6 F_PLL should be 180MHz, but is not.");
+#if (F_PLL == 180000000)
+    //Serial.println("ERROR: Teensy 3.6 F_PLL should be 180MHz, but is not.");
   const tmclk clkArr[numFreqs] = {{16, 1875}, {32, 1875}, {64, 1875}, {196, 3125}, {16, 255}, {128, 1875}, {219, 1604}, {32, 225}, {219, 802}};
-//#elif (F_PLL==120000000)
-//  const tmclk clkArr[numFreqs] = {{xx, yyyy}, {xx, yyyy}, {xx, yyyy}, {205, 2179}, {8,   85}, {64,   625}, {128, 625 }, {16,75}, {xxx, yyy} };
-//#endif
+#elif (F_PLL==120000000)  //can't have 96k set in spectrum, even if not using and if using max is 48k, signal gen around 20k
+  const tmclk clkArr[numFreqs] = {{24, 1875}, {48, 1875}, {96, 1875}, {205, 2179}, {8,   85}, {64,   625}, {128, 625 }, {16,75}, {145, 354} };
+#endif
 /*  Info:
   #define I2S0_MCR          (*(volatile uint32_t *)0x4002F100) // SAI MCLK Control Register
   #define I2S_MCR_DUF       ((uint32_t)1<<31)                  // Divider Update Flag
@@ -2085,6 +2086,12 @@ double setI2SFreq(uint16_t iFreq)
 //rev.80
 #define DOUBLE_256 ((double) 256.0L)
   return  ((double)F_PLL) * ((double)clkArr[iFreq].mult) / (DOUBLE_256 * ((double)clkArr[iFreq].div));
+}
+
+void mytest(){
+  for(int i=0;i<9;i++){
+    Serial.printf("%d\t%8.2f\n", sampleFreqs[i], setI2SFreq(i));  //setI2SFreq(sampleFreqs[i])
+  }
 }
 
 // valueStringSign()
