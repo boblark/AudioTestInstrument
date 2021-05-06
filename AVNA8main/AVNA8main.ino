@@ -2064,8 +2064,16 @@ double setI2SFreq(uint16_t iFreq)
 #if (F_PLL == 180000000)
     //Serial.println("ERROR: Teensy 3.6 F_PLL should be 180MHz, but is not.");
   const tmclk clkArr[numFreqs] = {{16, 1875}, {32, 1875}, {64, 1875}, {196, 3125}, {16, 255}, {128, 1875}, {219, 1604}, {32, 225}, {219, 802}};
+#elif (F_PLL==168000000)  //96k messes up signal gen and not much else better
+  Serial.println("144000000 works better on Teensy 3.5");
+  const tmclk clkArr[numFreqs] = {{24, 2625}, {16, 875}, {32, 875}, {42, 625}, {8, 119},     {64, 875},   {128, 875}, {16, 105},  {189, 646} };
+#elif (F_PLL==144000000)  //96k spectrum a little messed up, sig gen 23k BEST OF THE REST
+  const tmclk clkArr[numFreqs] = {{20, 1875}, {40, 1875}, {80, 1875}, {49, 625},     {4, 51},   {32, 375},   {64, 375},   {8, 45}, {128, 375}  };
 #elif (F_PLL==120000000)  //can't have 96k set in spectrum, even if not using and if using max is 48k, signal gen around 20k
+  Serial.println("144000000 works better on Teensy 3.5");
   const tmclk clkArr[numFreqs] = {{24, 1875}, {48, 1875}, {96, 1875}, {205, 2179}, {8,   85}, {64,   625}, {128, 625 }, {16,75}, {145, 354} };
+#elif (F_PLL==192000000)
+  const tmclk clkArr[numFreqs] = {{1, 125}, {2, 125}, {4, 125},{147, 2500}, {1, 17}, {8, 125}, {16, 125}, {2, 15}, {32, 125} };
 #endif
 /*  Info:
   #define I2S0_MCR          (*(volatile uint32_t *)0x4002F100) // SAI MCLK Control Register
