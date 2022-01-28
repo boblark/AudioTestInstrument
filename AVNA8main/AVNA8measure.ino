@@ -265,6 +265,8 @@ void measureT(void)
   vGainNorm = vGain / FreqData[nFreq].thruRefAmpl;
   vPhaseNorm = vPhase - FreqData[nFreq].thruRefPhase;
 
+if( verboseData && useUSB && !doingNano )    // rev 0.87
+  {
   Serial.print("nFreq="); Serial.print(nFreq);  
   Serial.print("  amplitudeV="); Serial.print(amplitudeV, 6);
   Serial.print("  amplitudeR="); Serial.print(amplitudeR, 6);// <<<< PROBLEM
@@ -272,7 +274,7 @@ void measureT(void)
   Serial.print("  thruRefAmpl="); Serial.print(FreqData[nFreq].thruRefAmpl  , 6);  
   Serial.print("  vGain="); Serial.print(vGain, 6);
   Serial.print("  vGainNorm="); Serial.println(vGainNorm, 6);
-
+  }
   if (vPhaseNorm < (-180.0))
      vPhaseNorm += 360.0;
   else if (vPhaseNorm > 180.0)

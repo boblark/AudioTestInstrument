@@ -64,6 +64,7 @@
    v0.8.4 Corrected cal for single frequency transmission.
    v0.8.5 Corrected output for Transmission AVNA measurements.
    v0.8.6 Catch EEPROM version errors and update EEPROM per CURRENT_VERSION.
+   v0.8.7 Fixed extra data dump in transmission. RSL 23 Jan 2022.
 */
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
