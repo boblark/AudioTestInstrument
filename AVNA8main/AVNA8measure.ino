@@ -337,14 +337,13 @@ boolean getFullDataPt(void)
 //      superAveNN[1] -= correctIsolationQ[  freq  ];
 //      }
 // That will do fine if the DUT is "matched".  Real Isolation with better 3125's is the answer, though.
+       amplitudeV = sqrtf( (float32_t) (superAveNN[1] * superAveNN[1] + superAveNN[0] * superAveNN[0]) );
+       amplitudeR = sqrtf( (float32_t) (superAveNN[3] * superAveNN[3] + superAveNN[2] * superAveNN[2]) );
 
-    amplitudeV = sqrtf( (float32_t) (superAveNN[1] * superAveNN[1] + superAveNN[0] * superAveNN[0]) );
-    amplitudeR = sqrtf( (float32_t) (superAveNN[3] * superAveNN[3] + superAveNN[2] * superAveNN[2]) );
-    
-    
+if(DIAGNOSTICS) {    
     Serial.print("superAveNN[3]="); Serial.print(superAveNN[3], 6);
     Serial.print("superAveNN[2]="); Serial.println(superAveNN[2], 6);
-    
+    }
     
     // Minus signs reflect the hookup of the inputs to U1A and U1D:
     phaseV = r2df(atan2f(-(float32_t)superAveNN[0], -(float32_t)superAveNN[1]));

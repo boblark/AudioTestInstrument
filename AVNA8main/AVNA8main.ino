@@ -21,7 +21,7 @@
  */
 
 
-/* RSL_VNA5.ino    v0.7.0
+/* RSL_VNA5.ino    v0.87  23 Jan 2022
    Orig v0.1.0   18 Dec 2016
    Output a sine wave from the Left CODEC Line Output
    Receive that signal with Left Codec input.
@@ -68,7 +68,7 @@
 
 // Keep version (0,255).  Rev 0.70: Not put into EEPROM byte 0 anymore.
 // ALSO - Catch  topLine2(void) around the bottom of AVNA8lcd.ino.  It is messy to convert from CURRENT_VERSION.
-#define CURRENT_VERSION 86
+#define CURRENT_VERSION 87
 
 // Teensy serial/uart 4, using Teensy Pin 31 and Pin 32.
 #define HWSERIAL4 Serial4
@@ -126,7 +126,7 @@
 #include <Wire.h>
 #include <SPI.h>
 // #include <SD.h>
-#include <SD_t3.h>
+// #include <SD_t3.h>
 #include <SerialFlash.h>
 #include <EEPROM.h>
 #include <XPT2046_Touchscreen.h>

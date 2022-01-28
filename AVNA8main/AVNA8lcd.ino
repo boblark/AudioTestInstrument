@@ -714,9 +714,9 @@ void  exploreSDCard(void)
       Serial.println(volumesize/2048);
 
       Serial.println("Files found on the card (name, date and size in bytes): ");
-      root.openRoot(volume);
+ //     root.openRoot(volume);
       // list all files in the card with date and size
-      root.ls(LS_R | LS_DATE | LS_SIZE);
+ //     root.ls(LS_R | LS_DATE | LS_SIZE);
       Serial.println("");
       }
     }
