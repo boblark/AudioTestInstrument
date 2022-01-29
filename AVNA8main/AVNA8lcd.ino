@@ -438,7 +438,7 @@ void topLine2(void)
   tft.fillRect(0, 22, tft.width(), 16, ILI9341_BLACK);
   tft.setTextColor(ILI9341_WHITE);
   tft.setCursor(5, 22);
-  tft.print("Ver 0.86 de W7PUA");
+  tft.print("Ver 0.87 de W7PUA");
   tft.setTextColor(ILI9341_YELLOW);
   }
 
